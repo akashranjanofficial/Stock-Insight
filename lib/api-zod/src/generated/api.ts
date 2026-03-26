@@ -133,24 +133,91 @@ export const GetStockAnalysisResponse = zod.object({
     strength: zod.enum(["STRONG", "MODERATE", "WEAK"]),
     summary: zod.string(),
     keyPoints: zod.array(zod.string()),
+    technicalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
+    fundamentalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
   }),
   shortTerm: zod.object({
     direction: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
     strength: zod.enum(["STRONG", "MODERATE", "WEAK"]),
     summary: zod.string(),
     keyPoints: zod.array(zod.string()),
+    technicalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
+    fundamentalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
   }),
   longTerm: zod.object({
     direction: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
     strength: zod.enum(["STRONG", "MODERATE", "WEAK"]),
     summary: zod.string(),
     keyPoints: zod.array(zod.string()),
+    technicalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
+    fundamentalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
   }),
   overallBias: zod.object({
     direction: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
     strength: zod.enum(["STRONG", "MODERATE", "WEAK"]),
     summary: zod.string(),
     keyPoints: zod.array(zod.string()),
+    technicalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
+    fundamentalSignals: zod.array(
+      zod.object({
+        label: zod.string(),
+        signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+        detail: zod.string(),
+      }),
+    ),
+  }),
+  volumeAnalysis: zod.object({
+    currentVolume: zod.number(),
+    avgVolume20d: zod.number().nullish(),
+    volumeRatio: zod.number().nullish(),
+    trend: zod.enum(["INCREASING", "DECREASING", "NEUTRAL"]),
+    signal: zod.enum(["BULLISH", "BEARISH", "NEUTRAL"]),
+    interpretation: zod.string(),
+    climaxVolume: zod.boolean(),
+    dryUpVolume: zod.boolean(),
+    recentVolumes: zod.array(zod.number()),
   }),
 });
 

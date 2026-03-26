@@ -7,6 +7,7 @@
  */
 import type { AnalysisBias } from "./analysisBias";
 import type { TechnicalIndicators } from "./technicalIndicators";
+import type { VolumeAnalysis } from "./volumeAnalysis";
 
 export interface StockAnalysis {
   symbol: string;
@@ -15,4 +16,5 @@ export interface StockAnalysis {
   shortTerm: AnalysisBias;
   longTerm: AnalysisBias;
   overallBias: AnalysisBias;
+  volumeAnalysis: VolumeAnalysis;
 }

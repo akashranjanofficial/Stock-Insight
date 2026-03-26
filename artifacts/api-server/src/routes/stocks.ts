@@ -15,6 +15,8 @@ function formatSymbol(symbol: string): string {
   return symbol.toUpperCase().replace(/\.(NS|BO)$/, "");
 }
 
+// ─── Technical Calculators ────────────────────────────────────────────────────
+
 function calcRSI(closes: number[], period = 14): number | null {
   if (closes.length < period + 1) return null;
   let gains = 0, losses = 0;
@@ -56,7 +58,7 @@ function calcMACD(closes: number[]): { macd: number | null; signal: number | nul
   return { macd, signal, histogram };
 }
 
-function calcBollinger(closes: number[], period = 20): { upper: number | null; middle: number | null; lower: number | null } {
+function calcBollinger(closes: number[], period = 20) {
   if (closes.length < period) return { upper: null, middle: null, lower: null };
   const slice = closes.slice(-period);
   const mean = slice.reduce((a, b) => a + b, 0) / period;
@@ -84,7 +86,7 @@ function calcATR(candles: { high: number; low: number; close: number }[], period
   return parseFloat((recent.reduce((a, b) => a + b, 0) / period).toFixed(2));
 }
 
-function calcStochastic(candles: { high: number; low: number; close: number }[], period = 14): { k: number | null; d: number | null } {
+function calcStochastic(candles: { high: number; low: number; close: number }[], period = 14) {
   if (candles.length < period) return { k: null, d: null };
   const recent = candles.slice(-period);
   const highest = Math.max(...recent.map((c) => c.high));
@@ -130,91 +132,263 @@ function calcADX(candles: { high: number; low: number; close: number }[], period
 
 function calcPivot(high: number, low: number, close: number) {
   const pp = (high + low + close) / 3;
-  const r1 = 2 * pp - low;
-  const r2 = pp + (high - low);
-  const s1 = 2 * pp - high;
-  const s2 = pp - (high - low);
   return {
     pivotPoint: parseFloat(pp.toFixed(2)),
-    resistance1: parseFloat(r1.toFixed(2)),
-    resistance2: parseFloat(r2.toFixed(2)),
-    support1: parseFloat(s1.toFixed(2)),
-    support2: parseFloat(s2.toFixed(2)),
+    resistance1: parseFloat((2 * pp - low).toFixed(2)),
+    resistance2: parseFloat((pp + (high - low)).toFixed(2)),
+    support1: parseFloat((2 * pp - high).toFixed(2)),
+    support2: parseFloat((pp - (high - low)).toFixed(2)),
   };
 }
 
-type Direction = "BULLISH" | "BEARISH" | "NEUTRAL";
-type Strength = "STRONG" | "MODERATE" | "WEAK";
+// ─── Volume Analysis ──────────────────────────────────────────────────────────
 
-function determineBias(
+function calcVolumeAnalysis(candles: { close: number; open: number; volume: number }[], currentVol: number) {
+  const vols = candles.map((c) => c.volume).filter((v) => v > 0);
+  const recent20 = vols.slice(-20);
+  const avgVolume20d = recent20.length > 0 ? recent20.reduce((a, b) => a + b, 0) / recent20.length : null;
+  const volumeRatio = avgVolume20d && avgVolume20d > 0 ? parseFloat((currentVol / avgVolume20d).toFixed(2)) : null;
+
+  // Volume trend over last 10 days
+  const last10 = vols.slice(-10);
+  const first5avg = last10.slice(0, 5).reduce((a, b) => a + b, 0) / 5;
+  const last5avg = last10.slice(-5).reduce((a, b) => a + b, 0) / 5;
+  const volTrend: "INCREASING" | "DECREASING" | "NEUTRAL" =
+    last5avg > first5avg * 1.1 ? "INCREASING" : last5avg < first5avg * 0.9 ? "DECREASING" : "NEUTRAL";
+
+  // Is this climax volume? (current > 2x avg)
+  const climaxVolume = volumeRatio !== null && volumeRatio > 2.0;
+  // Is volume drying up? (current < 0.5x avg)
+  const dryUpVolume = volumeRatio !== null && volumeRatio < 0.5;
+
+  // Determine signal based on price action + volume
+  const lastCandle = candles[candles.length - 1];
+  const priceUp = lastCandle ? lastCandle.close > lastCandle.open : false;
+
+  let signal: "BULLISH" | "BEARISH" | "NEUTRAL" = "NEUTRAL";
+  let interpretation = "";
+
+  if (climaxVolume && priceUp) {
+    signal = "BULLISH";
+    interpretation = "Climax buying volume with price rising — strong demand confirmed by institutional participation.";
+  } else if (climaxVolume && !priceUp) {
+    signal = "BEARISH";
+    interpretation = "Climax selling volume with price falling — strong supply pressure, potential capitulation or distribution.";
+  } else if (dryUpVolume && priceUp) {
+    signal = "BEARISH";
+    interpretation = "Price rising on low volume — weak rally, lack of conviction. Potential false breakout.";
+  } else if (dryUpVolume && !priceUp) {
+    signal = "BULLISH";
+    interpretation = "Price falling on low volume — selling pressure drying up. Potential exhaustion of selling.";
+  } else if (volTrend === "INCREASING" && priceUp) {
+    signal = "BULLISH";
+    interpretation = "Rising volume accompanying price gains — healthy uptrend with increasing participation.";
+  } else if (volTrend === "INCREASING" && !priceUp) {
+    signal = "BEARISH";
+    interpretation = "Rising volume on price decline — bearish distribution pattern with increasing selling pressure.";
+  } else if (volTrend === "DECREASING" && priceUp) {
+    signal = "NEUTRAL";
+    interpretation = "Price rising but volume declining — momentum may be weakening. Watch for reversal.";
+  } else {
+    signal = "NEUTRAL";
+    interpretation = `Volume is ${volTrend.toLowerCase()} at ${volumeRatio !== null ? volumeRatio.toFixed(2) + "x average" : "normal levels"}.`;
+  }
+
+  return {
+    currentVolume: currentVol,
+    avgVolume20d: avgVolume20d ? parseFloat(avgVolume20d.toFixed(0)) : null,
+    volumeRatio,
+    trend: volTrend,
+    signal,
+    interpretation,
+    climaxVolume,
+    dryUpVolume,
+    recentVolumes: vols.slice(-20).map((v) => parseFloat(v.toFixed(0))),
+  };
+}
+
+// ─── Combined Bias Builder ────────────────────────────────────────────────────
+
+type Direction = "BULLISH" | "BEARISH" | "NEUTRAL";
+type Strength  = "STRONG" | "MODERATE" | "WEAK";
+type Signal    = "BULLISH" | "BEARISH" | "NEUTRAL";
+
+interface SignalPoint { label: string; signal: Signal; detail: string }
+
+function buildBias(
+  timeframeLabel: string,
+  technicalSignals: SignalPoint[],
+  fundamentalSignals: SignalPoint[]
+) {
+  const allSignals = [...technicalSignals, ...fundamentalSignals];
+  let bull = allSignals.filter((s) => s.signal === "BULLISH").length;
+  let bear = allSignals.filter((s) => s.signal === "BEARISH").length;
+  const total = bull + bear + allSignals.filter((s) => s.signal === "NEUTRAL").length;
+
+  let direction: Direction = bull > bear ? "BULLISH" : bear > bull ? "BEARISH" : "NEUTRAL";
+  const diff = Math.abs(bull - bear);
+  let strength: Strength = diff >= 4 ? "STRONG" : diff >= 2 ? "MODERATE" : "WEAK";
+  if (direction === "NEUTRAL") strength = "WEAK";
+
+  const dirText = direction === "BULLISH" ? "bullish" : direction === "BEARISH" ? "bearish" : "neutral";
+  const summary = `${timeframeLabel} outlook is ${strength.toLowerCase()} ${dirText}. Technicals: ${bull + bear > 0 ? `${bull} bull / ${bear} bear` : "mixed"}. Fundamentals ${fundamentalSignals.filter(s => s.signal === "BULLISH").length > fundamentalSignals.filter(s => s.signal === "BEARISH").length ? "support the thesis" : fundamentalSignals.filter(s => s.signal === "BEARISH").length > 0 ? "raise concerns" : "are neutral"}.`;
+
+  const keyPoints = [
+    ...technicalSignals.filter((s) => s.signal !== "NEUTRAL").slice(0, 3).map((s) => `[Tech] ${s.detail}`),
+    ...fundamentalSignals.filter((s) => s.signal !== "NEUTRAL").slice(0, 2).map((s) => `[Fund] ${s.detail}`),
+  ];
+
+  return { direction, strength, summary, keyPoints, technicalSignals, fundamentalSignals };
+}
+
+function getTechnicalSignals(
+  price: number,
   rsi: number | null,
   macd: number | null,
-  price: number,
+  macdHistogram: number | null,
   sma20: number | null,
   sma50: number | null,
   sma200: number | null,
-  timeframe: string
-): { direction: Direction; strength: Strength; summary: string; keyPoints: string[] } {
-  let bullScore = 0, bearScore = 0;
-  const keyPoints: string[] = [];
+  ema9: number | null,
+  ema21: number | null,
+  stochK: number | null,
+  adx: number | null,
+  bb: { upper: number | null; middle: number | null; lower: number | null },
+  vwap: number | null,
+  timeframe: "intraday" | "shortTerm" | "longTerm"
+): SignalPoint[] {
+  const signals: SignalPoint[] = [];
 
   if (rsi !== null) {
-    if (rsi > 60) { bullScore += 2; keyPoints.push(`RSI at ${rsi} - bullish momentum`); }
-    else if (rsi < 40) { bearScore += 2; keyPoints.push(`RSI at ${rsi} - bearish momentum`); }
-    else { keyPoints.push(`RSI at ${rsi} - neutral zone`); }
+    if (rsi > 70) signals.push({ label: "RSI", signal: "BEARISH", detail: `RSI ${rsi} — overbought, potential reversal risk` });
+    else if (rsi < 30) signals.push({ label: "RSI", signal: "BULLISH", detail: `RSI ${rsi} — oversold, potential bounce zone` });
+    else if (rsi > 55) signals.push({ label: "RSI", signal: "BULLISH", detail: `RSI ${rsi} — bullish momentum zone` });
+    else if (rsi < 45) signals.push({ label: "RSI", signal: "BEARISH", detail: `RSI ${rsi} — bearish momentum zone` });
+    else signals.push({ label: "RSI", signal: "NEUTRAL", detail: `RSI ${rsi} — neutral zone (45-55)` });
   }
 
   if (macd !== null) {
-    if (macd > 0) { bullScore += 1; keyPoints.push("MACD above zero - upward trend"); }
-    else { bearScore += 1; keyPoints.push("MACD below zero - downward pressure"); }
+    const h = macdHistogram ?? 0;
+    if (macd > 0 && h > 0) signals.push({ label: "MACD", signal: "BULLISH", detail: `MACD ${macd.toFixed(2)} above zero, histogram expanding bullish` });
+    else if (macd > 0 && h < 0) signals.push({ label: "MACD", signal: "NEUTRAL", detail: `MACD positive but histogram contracting — momentum fading` });
+    else if (macd < 0 && h < 0) signals.push({ label: "MACD", signal: "BEARISH", detail: `MACD ${macd.toFixed(2)} below zero, histogram expanding bearish` });
+    else signals.push({ label: "MACD", signal: "NEUTRAL", detail: `MACD below zero but recovering — early sign of reversal` });
   }
 
-  if (sma20 !== null) {
-    if (price > sma20) { bullScore += 1; keyPoints.push(`Price above SMA20 (${sma20})`); }
-    else { bearScore += 1; keyPoints.push(`Price below SMA20 (${sma20})`); }
+  if (timeframe === "intraday" || timeframe === "shortTerm") {
+    if (sma20 !== null) {
+      if (price > sma20) signals.push({ label: "SMA20", signal: "BULLISH", detail: `Price ${price.toFixed(2)} above SMA20 ${sma20} — short-term uptrend intact` });
+      else signals.push({ label: "SMA20", signal: "BEARISH", detail: `Price ${price.toFixed(2)} below SMA20 ${sma20} — short-term downtrend` });
+    }
+    if (vwap !== null && timeframe === "intraday") {
+      if (price > vwap) signals.push({ label: "VWAP", signal: "BULLISH", detail: `Price above VWAP ${vwap.toFixed(2)} — intraday buyers in control` });
+      else signals.push({ label: "VWAP", signal: "BEARISH", detail: `Price below VWAP ${vwap.toFixed(2)} — intraday sellers dominant` });
+    }
   }
 
-  if (sma50 !== null) {
-    if (price > sma50) { bullScore += 1; keyPoints.push(`Price above SMA50 (${sma50})`); }
-    else { bearScore += 1; keyPoints.push(`Price below SMA50 (${sma50})`); }
+  if (timeframe === "shortTerm" || timeframe === "longTerm") {
+    if (sma50 !== null) {
+      if (price > sma50) signals.push({ label: "SMA50", signal: "BULLISH", detail: `Price above SMA50 ${sma50} — intermediate uptrend` });
+      else signals.push({ label: "SMA50", signal: "BEARISH", detail: `Price below SMA50 ${sma50} — intermediate downtrend` });
+    }
   }
 
-  if (sma200 !== null) {
-    if (price > sma200) { bullScore += 2; keyPoints.push(`Price above SMA200 (${sma200}) - long-term bullish`); }
-    else { bearScore += 2; keyPoints.push(`Price below SMA200 (${sma200}) - long-term bearish`); }
+  if (timeframe === "longTerm" && sma200 !== null) {
+    if (price > sma200) signals.push({ label: "SMA200", signal: "BULLISH", detail: `Price above SMA200 ${sma200} — secular bullish trend` });
+    else signals.push({ label: "SMA200", signal: "BEARISH", detail: `Price below SMA200 ${sma200} — secular bearish trend` });
   }
 
-  const total = bullScore + bearScore;
-  let direction: Direction = "NEUTRAL";
-  let strength: Strength = "WEAK";
-
-  if (bullScore > bearScore) {
-    direction = "BULLISH";
-    const ratio = bullScore / (total || 1);
-    strength = ratio > 0.7 ? "STRONG" : ratio > 0.55 ? "MODERATE" : "WEAK";
-  } else if (bearScore > bullScore) {
-    direction = "BEARISH";
-    const ratio = bearScore / (total || 1);
-    strength = ratio > 0.7 ? "STRONG" : ratio > 0.55 ? "MODERATE" : "WEAK";
+  if (stochK !== null) {
+    if (stochK > 80) signals.push({ label: "Stochastic", signal: "BEARISH", detail: `Stoch %K ${stochK} — overbought territory` });
+    else if (stochK < 20) signals.push({ label: "Stochastic", signal: "BULLISH", detail: `Stoch %K ${stochK} — oversold territory, reversal likely` });
+    else signals.push({ label: "Stochastic", signal: "NEUTRAL", detail: `Stoch %K ${stochK} — neutral range` });
   }
 
-  const dirText = direction === "BULLISH" ? "bullish" : direction === "BEARISH" ? "bearish" : "neutral";
-  const summary = `${timeframe} outlook is ${strength.toLowerCase()} ${dirText} based on current technical indicators.`;
+  if (adx !== null) {
+    if (adx > 25) signals.push({ label: "ADX", signal: "NEUTRAL", detail: `ADX ${adx.toFixed(1)} — strong trend detected (price confirms direction)` });
+    else signals.push({ label: "ADX", signal: "NEUTRAL", detail: `ADX ${adx.toFixed(1)} — weak/ranging market, trend signals less reliable` });
+  }
 
-  return { direction, strength, summary, keyPoints: keyPoints.slice(0, 4) };
+  if (bb.upper !== null && bb.lower !== null) {
+    if (price >= bb.upper) signals.push({ label: "Bollinger", signal: "BEARISH", detail: `Price at upper Bollinger Band ${bb.upper.toFixed(2)} — overbought / mean-reversion risk` });
+    else if (price <= bb.lower) signals.push({ label: "Bollinger", signal: "BULLISH", detail: `Price at lower Bollinger Band ${bb.lower.toFixed(2)} — oversold / bounce potential` });
+    else signals.push({ label: "Bollinger", signal: "NEUTRAL", detail: `Price inside Bollinger Bands — consolidation phase` });
+  }
+
+  return signals;
 }
+
+function getFundamentalSignals(fundData: any, volAnalysis: any): SignalPoint[] {
+  const signals: SignalPoint[] = [];
+
+  if (fundData?.pe !== null && fundData?.pe !== undefined) {
+    const pe = fundData.pe;
+    if (pe > 0 && pe < 15) signals.push({ label: "P/E Ratio", signal: "BULLISH", detail: `P/E ${pe.toFixed(1)}x — undervalued relative to market norms` });
+    else if (pe > 50) signals.push({ label: "P/E Ratio", signal: "BEARISH", detail: `P/E ${pe.toFixed(1)}x — richly valued, growth must justify premium` });
+    else if (pe > 25) signals.push({ label: "P/E Ratio", signal: "NEUTRAL", detail: `P/E ${pe.toFixed(1)}x — fairly valued for quality business` });
+    else if (pe > 0) signals.push({ label: "P/E Ratio", signal: "BULLISH", detail: `P/E ${pe.toFixed(1)}x — reasonable valuation` });
+    else signals.push({ label: "P/E Ratio", signal: "BEARISH", detail: `Negative earnings — company is loss-making` });
+  }
+
+  if (fundData?.roe !== null && fundData?.roe !== undefined) {
+    const roe = fundData.roe;
+    if (roe > 20) signals.push({ label: "ROE", signal: "BULLISH", detail: `ROE ${roe.toFixed(1)}% — excellent capital efficiency (>20%)` });
+    else if (roe > 12) signals.push({ label: "ROE", signal: "NEUTRAL", detail: `ROE ${roe.toFixed(1)}% — decent capital returns` });
+    else signals.push({ label: "ROE", signal: "BEARISH", detail: `ROE ${roe.toFixed(1)}% — poor capital efficiency` });
+  }
+
+  if (fundData?.debtToEquity !== null && fundData?.debtToEquity !== undefined) {
+    const de = fundData.debtToEquity;
+    if (de < 0.3) signals.push({ label: "Debt/Equity", signal: "BULLISH", detail: `D/E ${de.toFixed(2)} — minimal leverage, strong balance sheet` });
+    else if (de < 1.0) signals.push({ label: "Debt/Equity", signal: "NEUTRAL", detail: `D/E ${de.toFixed(2)} — moderate leverage, manageable debt` });
+    else signals.push({ label: "Debt/Equity", signal: "BEARISH", detail: `D/E ${de.toFixed(2)} — high leverage, increased financial risk` });
+  }
+
+  if (fundData?.revenueGrowthYoy !== null && fundData?.revenueGrowthYoy !== undefined) {
+    const rg = fundData.revenueGrowthYoy;
+    if (rg > 15) signals.push({ label: "Revenue Growth", signal: "BULLISH", detail: `Revenue grew ${rg.toFixed(1)}% YoY — strong top-line momentum` });
+    else if (rg > 5) signals.push({ label: "Revenue Growth", signal: "NEUTRAL", detail: `Revenue grew ${rg.toFixed(1)}% YoY — moderate growth` });
+    else if (rg < 0) signals.push({ label: "Revenue Growth", signal: "BEARISH", detail: `Revenue declined ${Math.abs(rg).toFixed(1)}% YoY — business headwinds` });
+    else signals.push({ label: "Revenue Growth", signal: "NEUTRAL", detail: `Revenue grew ${rg.toFixed(1)}% YoY — slow growth` });
+  }
+
+  if (fundData?.profitGrowthYoy !== null && fundData?.profitGrowthYoy !== undefined) {
+    const pg = fundData.profitGrowthYoy;
+    if (pg > 20) signals.push({ label: "Profit Growth", signal: "BULLISH", detail: `Profit grew ${pg.toFixed(1)}% YoY — strong earnings expansion` });
+    else if (pg < 0) signals.push({ label: "Profit Growth", signal: "BEARISH", detail: `Profit declined ${Math.abs(pg).toFixed(1)}% YoY — earnings contraction` });
+    else signals.push({ label: "Profit Growth", signal: "NEUTRAL", detail: `Profit grew ${pg.toFixed(1)}% YoY` });
+  }
+
+  if (fundData?.currentRatio !== null && fundData?.currentRatio !== undefined) {
+    const cr = fundData.currentRatio;
+    if (cr > 2) signals.push({ label: "Current Ratio", signal: "BULLISH", detail: `Current ratio ${cr.toFixed(2)} — strong short-term liquidity` });
+    else if (cr > 1) signals.push({ label: "Current Ratio", signal: "NEUTRAL", detail: `Current ratio ${cr.toFixed(2)} — adequate liquidity` });
+    else signals.push({ label: "Current Ratio", signal: "BEARISH", detail: `Current ratio ${cr.toFixed(2)} — potential liquidity risk` });
+  }
+
+  // Volume as a fundamental confirmation
+  if (volAnalysis) {
+    if (volAnalysis.signal === "BULLISH") {
+      signals.push({ label: "Volume Trend", signal: "BULLISH", detail: volAnalysis.interpretation });
+    } else if (volAnalysis.signal === "BEARISH") {
+      signals.push({ label: "Volume Trend", signal: "BEARISH", detail: volAnalysis.interpretation });
+    } else {
+      signals.push({ label: "Volume Trend", signal: "NEUTRAL", detail: volAnalysis.interpretation });
+    }
+  }
+
+  return signals;
+}
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
 
 router.get("/search", async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
-    if (!q) {
-      res.json([]);
-      return;
-    }
-
+    if (!q) { res.json([]); return; }
     const results = await yahooFinance.search(q, { newsCount: 0, quotesCount: 10 });
     const quotes = (results.quotes || [])
-      .filter((r: any) => r.quoteType === "EQUITY" && (r.exchange === "NSI" || r.exchange === "BSE" || (r.symbol || "").endsWith(".NS") || (r.symbol || "").endsWith(".BO")))
+      .filter((r: any) => r.quoteType === "EQUITY" && ((r.symbol || "").endsWith(".NS") || (r.symbol || "").endsWith(".BO")))
       .slice(0, 8)
       .map((r: any) => ({
         symbol: formatSymbol(r.symbol),
@@ -223,7 +397,6 @@ router.get("/search", async (req, res) => {
         sector: r.sector || "N/A",
         marketCap: null,
       }));
-
     res.json(quotes);
   } catch (err: any) {
     req.log.error({ err }, "Search error");
@@ -236,8 +409,7 @@ router.get("/:symbol/quote", async (req, res) => {
     const exchange = String(req.query.exchange || "NSE");
     const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
     const quote = await yahooFinance.quote(yahooSymbol);
-
-    const data = {
+    res.json({
       symbol: formatSymbol(yahooSymbol),
       name: quote.longName || quote.shortName || req.params.symbol,
       exchange,
@@ -254,9 +426,7 @@ router.get("/:symbol/quote", async (req, res) => {
       week52High: quote.fiftyTwoWeekHigh ?? 0,
       week52Low: quote.fiftyTwoWeekLow ?? 0,
       timestamp: new Date().toISOString(),
-    };
-
-    res.json(data);
+    });
   } catch (err: any) {
     req.log.error({ err }, "Quote error");
     res.status(500).json({ error: "Failed to fetch quote" });
@@ -269,22 +439,18 @@ router.get("/:symbol/chart", async (req, res) => {
     const interval = String(req.query.interval || "1d");
     const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
 
-    const intervalMap: Record<string, { period1: string; interval: any }> = {
-      "5m":  { period1: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "5m" },
-      "15m": { period1: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "15m" },
-      "30m": { period1: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "30m" },
-      "1h":  { period1: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "1h" },
-      "4h":  { period1: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "60m" },
-      "1d":  { period1: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "1d" },
-      "1wk": { period1: new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "1wk" },
-      "1mo": { period1: new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], interval: "1mo" },
+    const cfgMap: Record<string, { period1: string; interval: any }> = {
+      "5m":  { period1: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0], interval: "5m" },
+      "15m": { period1: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0], interval: "15m" },
+      "30m": { period1: new Date(Date.now() - 10 * 86400000).toISOString().split("T")[0], interval: "30m" },
+      "1h":  { period1: new Date(Date.now() - 20 * 86400000).toISOString().split("T")[0], interval: "1h" },
+      "4h":  { period1: new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0], interval: "60m" },
+      "1d":  { period1: new Date(Date.now() - 365 * 86400000).toISOString().split("T")[0], interval: "1d" },
+      "1wk": { period1: new Date(Date.now() - 3 * 365 * 86400000).toISOString().split("T")[0], interval: "1wk" },
+      "1mo": { period1: new Date(Date.now() - 5 * 365 * 86400000).toISOString().split("T")[0], interval: "1mo" },
     };
-
-    const cfg = intervalMap[interval] || intervalMap["1d"];
-    const historical = await yahooFinance.chart(yahooSymbol, {
-      period1: cfg.period1,
-      interval: cfg.interval,
-    });
+    const cfg = cfgMap[interval] || cfgMap["1d"];
+    const historical = await yahooFinance.chart(yahooSymbol, { period1: cfg.period1, interval: cfg.interval });
 
     const candles = (historical.quotes || [])
       .filter((c: any) => c.open != null && c.close != null)
@@ -296,7 +462,6 @@ router.get("/:symbol/chart", async (req, res) => {
         close: parseFloat((c.close ?? 0).toFixed(2)),
         volume: c.volume ?? 0,
       }));
-
     res.json(candles);
   } catch (err: any) {
     req.log.error({ err }, "Chart error");
@@ -309,81 +474,99 @@ router.get("/:symbol/analysis", async (req, res) => {
     const exchange = String(req.query.exchange || "NSE");
     const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
 
-    const [dailyData, quote] = await Promise.all([
+    // Fetch daily price history + live quote + fundamentals in parallel
+    const [dailyData, quote, fundSummary] = await Promise.all([
       yahooFinance.chart(yahooSymbol, {
-        period1: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        period1: new Date(Date.now() - 365 * 86400000).toISOString().split("T")[0],
         interval: "1d",
       }),
       yahooFinance.quote(yahooSymbol),
+      yahooFinance.quoteSummary(yahooSymbol, {
+        modules: ["financialData", "defaultKeyStatistics", "summaryDetail"],
+      }).catch(() => null),
     ]);
 
     const candles = (dailyData.quotes || []).filter((c: any) => c.open != null && c.close != null);
-    const closes = candles.map((c: any) => c.close as number);
-    const price = quote.regularMarketPrice ?? (closes[closes.length - 1] ?? 0);
+    const closes  = candles.map((c: any) => c.close as number);
+    const price   = quote.regularMarketPrice ?? (closes[closes.length - 1] ?? 0);
+    const currentVol = quote.regularMarketVolume ?? 0;
 
-    const rsi = calcRSI(closes);
-    const { macd, macdSignal, macdHistogram } = calcMACD(closes);
-    const sma20 = calcSMA(closes, 20);
-    const sma50 = calcSMA(closes, 50);
-    const sma200 = calcSMA(closes, 200);
-    const ema9 = calcEMA(closes, 9);
-    const ema21 = calcEMA(closes, 21);
-    const bb = calcBollinger(closes);
-    const atr = calcATR(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
-    const adx = calcADX(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
-    const stoch = calcStochastic(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
-    const vwap = calcVWAP(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0 })));
-
-    const lastCandle = candles[candles.length - 1];
-    const pivot = lastCandle ? calcPivot(lastCandle.high, lastCandle.low, lastCandle.close) : { pivotPoint: null, resistance1: null, resistance2: null, support1: null, support2: null };
-
-    const intraday = determineBias(rsi, macd, price, sma20, ema9, ema21, "Intraday");
-    const shortTerm = determineBias(rsi, macd, price, sma20, sma50, null, "Short-term (1-4 weeks)");
-    const longTerm = determineBias(rsi, macd, price, sma50, sma200, null, "Long-term (3-12 months)");
-
-    let bullCount = [intraday, shortTerm, longTerm].filter(b => b.direction === "BULLISH").length;
-    let bearCount = [intraday, shortTerm, longTerm].filter(b => b.direction === "BEARISH").length;
-    let overallDir: Direction = bullCount > bearCount ? "BULLISH" : bearCount > bullCount ? "BEARISH" : "NEUTRAL";
-    let overallStrength: Strength = Math.abs(bullCount - bearCount) >= 2 ? "STRONG" : Math.abs(bullCount - bearCount) === 1 ? "MODERATE" : "WEAK";
-
-    const overallBias = {
-      direction: overallDir,
-      strength: overallStrength,
-      summary: `Overall technical picture is ${overallStrength.toLowerCase()} ${overallDir.toLowerCase()} across timeframes.`,
-      keyPoints: [
-        `Intraday: ${intraday.direction} (${intraday.strength})`,
-        `Short-term: ${shortTerm.direction} (${shortTerm.strength})`,
-        `Long-term: ${longTerm.direction} (${longTerm.strength})`,
-        `RSI: ${rsi ?? "N/A"} | MACD: ${macd ?? "N/A"}`,
-      ],
+    // Build fundamentals snapshot for signal generation
+    const fd  = fundSummary?.financialData;
+    const ks  = fundSummary?.defaultKeyStatistics;
+    const sd  = fundSummary?.summaryDetail;
+    const fundData = {
+      pe:                sd?.trailingPE ?? null,
+      pb:                ks?.priceToBook ?? null,
+      roe:               fd?.returnOnEquity ? fd.returnOnEquity * 100 : null,
+      debtToEquity:      fd?.debtToEquity ?? null,
+      currentRatio:      fd?.currentRatio ?? null,
+      revenueGrowthYoy:  fd?.revenueGrowth ? fd.revenueGrowth * 100 : null,
+      profitGrowthYoy:   fd?.earningsGrowth ? fd.earningsGrowth * 100 : null,
     };
+
+    // Technical indicators
+    const rsi           = calcRSI(closes);
+    const { macd, macdSignal, macdHistogram } = calcMACD(closes);
+    const sma20         = calcSMA(closes, 20);
+    const sma50         = calcSMA(closes, 50);
+    const sma200        = calcSMA(closes, 200);
+    const ema9          = calcEMA(closes, 9);
+    const ema21         = calcEMA(closes, 21);
+    const bb            = calcBollinger(closes);
+    const atr           = calcATR(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
+    const adx           = calcADX(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
+    const stoch         = calcStochastic(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
+    const vwap          = calcVWAP(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0 })));
+    const lastCandle    = candles[candles.length - 1];
+    const pivot         = lastCandle ? calcPivot(lastCandle.high, lastCandle.low, lastCandle.close) : { pivotPoint: null, resistance1: null, resistance2: null, support1: null, support2: null };
+
+    // Volume analysis
+    const volumeAnalysis = calcVolumeAnalysis(
+      candles.map((c: any) => ({ close: c.close, open: c.open, volume: c.volume ?? 0 })),
+      currentVol
+    );
+
+    // Build signals per timeframe
+    const techIntraday   = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "intraday");
+    const techShortTerm  = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "shortTerm");
+    const techLongTerm   = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "longTerm");
+    const fundSignals    = getFundamentalSignals(fundData, volumeAnalysis);
+
+    const intraday  = buildBias("Intraday",         techIntraday,  fundSignals);
+    const shortTerm = buildBias("Short-term",       techShortTerm, fundSignals);
+    const longTerm  = buildBias("Long-term",        techLongTerm,  fundSignals);
+
+    // Overall
+    const allBull = [intraday, shortTerm, longTerm].filter((b) => b.direction === "BULLISH").length;
+    const allBear = [intraday, shortTerm, longTerm].filter((b) => b.direction === "BEARISH").length;
+    const overallDir: Direction = allBull > allBear ? "BULLISH" : allBear > allBull ? "BEARISH" : "NEUTRAL";
+    const overallStr: Strength  = Math.abs(allBull - allBear) >= 2 ? "STRONG" : Math.abs(allBull - allBear) === 1 ? "MODERATE" : "WEAK";
+    const overallBias = buildBias("Overall", techShortTerm, fundSignals);
+    overallBias.direction = overallDir;
+    overallBias.strength = overallStr;
+    overallBias.summary = `Overall consensus is ${overallStr.toLowerCase()} ${overallDir.toLowerCase()}: ${allBull}/3 timeframes bullish, ${allBear}/3 bearish.`;
+    overallBias.keyPoints = [
+      `Intraday: ${intraday.direction} (${intraday.strength})`,
+      `Short-term: ${shortTerm.direction} (${shortTerm.strength})`,
+      `Long-term: ${longTerm.direction} (${longTerm.strength})`,
+      `Volume: ${volumeAnalysis.signal} — ratio ${volumeAnalysis.volumeRatio?.toFixed(2) ?? "N/A"}x avg`,
+    ];
 
     res.json({
       symbol: formatSymbol(yahooSymbol),
       technicalIndicators: {
-        rsi,
-        macd,
-        macdSignal,
-        macdHistogram,
-        sma20,
-        sma50,
-        sma200,
-        ema9,
-        ema21,
-        bollingerUpper: bb.upper,
-        bollingerMiddle: bb.middle,
-        bollingerLower: bb.lower,
-        atr,
-        adx,
-        stochK: stoch.k,
-        stochD: stoch.d,
-        vwap,
+        rsi, macd, macdSignal, macdHistogram,
+        sma20, sma50, sma200, ema9, ema21,
+        bollingerUpper: bb.upper, bollingerMiddle: bb.middle, bollingerLower: bb.lower,
+        atr, adx, stochK: stoch.k, stochD: stoch.d, vwap,
         ...pivot,
       },
       intraday,
       shortTerm,
       longTerm,
       overallBias,
+      volumeAnalysis,
     });
   } catch (err: any) {
     req.log.error({ err }, "Analysis error");
@@ -395,19 +578,16 @@ router.get("/:symbol/fundamentals", async (req, res) => {
   try {
     const exchange = String(req.query.exchange || "NSE");
     const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
-
     const summary = await yahooFinance.quoteSummary(yahooSymbol, {
       modules: ["financialData", "defaultKeyStatistics", "summaryProfile", "summaryDetail"],
     });
-
     const fd = summary.financialData;
     const ks = summary.defaultKeyStatistics;
     const sp = summary.summaryProfile;
     const sd = summary.summaryDetail;
-
     res.json({
       symbol: formatSymbol(yahooSymbol),
-      pe: sd?.trailingPE ?? ks?.trailingEps ? (sd?.trailingPE ?? null) : null,
+      pe: sd?.trailingPE ?? null,
       pb: ks?.priceToBook ?? null,
       eps: ks?.trailingEps ?? null,
       roe: fd?.returnOnEquity ? parseFloat((fd.returnOnEquity * 100).toFixed(2)) : null,
@@ -458,8 +638,8 @@ router.get("/:symbol/events", async (req, res) => {
         majorEvents.push({
           id: `earnings-${d}`,
           type: "EARNINGS",
-          title: `${symbol} Earnings Date`,
-          description: `Quarterly earnings announcement expected. EPS estimate: ${earnings.earningsAverage ?? "N/A"}`,
+          title: `${symbol} Quarterly Earnings`,
+          description: `Results announcement expected. EPS estimate: ${earnings.earningsAverage ?? "N/A"}. Beat/miss could cause 5-10% move.`,
           date: new Date(d).toISOString().split("T")[0],
           impact: "HIGH",
           sentiment: "NEUTRAL",
@@ -472,8 +652,8 @@ router.get("/:symbol/events", async (req, res) => {
       majorEvents.push({
         id: "dividend",
         type: "DIVIDEND",
-        title: `${symbol} Dividend`,
-        description: `Ex-dividend date: ${new Date(calendarEvents.calendarEvents.dividendDate).toLocaleDateString("en-IN")}`,
+        title: `${symbol} Ex-Dividend Date`,
+        description: `Stock typically drops by dividend amount on ex-date. Dividend investors should act before this date.`,
         date: new Date(calendarEvents.calendarEvents.dividendDate).toISOString().split("T")[0],
         impact: "MEDIUM",
         sentiment: "POSITIVE",
@@ -486,8 +666,8 @@ router.get("/:symbol/events", async (req, res) => {
       microEvents.push({
         id: `analyst-${u.epochGradeDate}`,
         type: "OTHER",
-        title: `${u.firm} - ${u.action === "up" ? "Upgrade" : u.action === "down" ? "Downgrade" : "Rating"}`,
-        description: `Analyst action: ${u.fromGrade ? `${u.fromGrade} → ` : ""}${u.toGrade}`,
+        title: `${u.firm}: ${u.action === "up" ? "Upgrade" : u.action === "down" ? "Downgrade" : "Rating Change"}`,
+        description: `Analyst action: ${u.fromGrade ? `${u.fromGrade} → ` : ""}${u.toGrade}. Analyst upgrades/downgrades often trigger institutional flows.`,
         date: new Date(u.epochGradeDate * 1000).toISOString().split("T")[0],
         impact: "MEDIUM",
         sentiment: u.action === "up" ? "POSITIVE" : u.action === "down" ? "NEGATIVE" : "NEUTRAL",
@@ -498,9 +678,9 @@ router.get("/:symbol/events", async (req, res) => {
     majorEvents.push({
       id: "rbi-policy",
       type: "MACRO",
-      title: "RBI Monetary Policy",
-      description: "RBI MPC meeting outcome and interest rate decisions can affect equity markets and rate-sensitive sectors.",
-      date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      title: "RBI Monetary Policy Decision",
+      description: "RBI MPC meeting: Interest rate decisions directly affect borrowing costs, bank margins, and equity valuations. Rate cuts are bullish; hikes compress P/E multiples.",
+      date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
       impact: "HIGH",
       sentiment: "NEUTRAL",
       isMajor: true,
@@ -509,9 +689,9 @@ router.get("/:symbol/events", async (req, res) => {
     majorEvents.push({
       id: "budget",
       type: "MACRO",
-      title: "Union Budget Expectations",
-      description: "Upcoming Union Budget may impact sector-specific allocations, tax structures, and capital markets.",
-      date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      title: "Union Budget 2025-26",
+      description: "Sector-specific allocations, LTCG/STCG tax rates, capital expenditure targets. Markets typically see elevated volatility around budget day.",
+      date: new Date(Date.now() + 60 * 86400000).toISOString().split("T")[0],
       impact: "HIGH",
       sentiment: "NEUTRAL",
       isMajor: true,
@@ -520,8 +700,8 @@ router.get("/:symbol/events", async (req, res) => {
     microEvents.push({
       id: "fii-activity",
       type: "SECTOR",
-      title: "FII/DII Activity",
-      description: "Track Foreign Institutional and Domestic Institutional investor flows affecting broader market sentiment.",
+      title: "FII/DII Institutional Flows",
+      description: "Net FII selling creates selling pressure especially in large-cap stocks. Track daily FII data — sustained selling triggers margin calls and further downside.",
       date: new Date().toISOString().split("T")[0],
       impact: "MEDIUM",
       sentiment: "NEUTRAL",
@@ -531,19 +711,26 @@ router.get("/:symbol/events", async (req, res) => {
     microEvents.push({
       id: "us-fed",
       type: "MACRO",
-      title: "US Federal Reserve Policy",
-      description: "US Fed rate decisions and commentary impact global risk sentiment and FII flows into Indian markets.",
-      date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      title: "US Federal Reserve FOMC",
+      description: "Fed rate decisions drive global risk appetite. Dovish Fed → EM capital inflows, stronger rupee. Hawkish Fed → FII outflows from India.",
+      date: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
       impact: "MEDIUM",
       sentiment: "NEUTRAL",
       isMajor: false,
     });
 
-    res.json({
-      symbol,
-      majorEvents,
-      microEvents,
+    microEvents.push({
+      id: "crude-oil",
+      type: "MACRO",
+      title: "Crude Oil Price Movement",
+      description: "India imports ~85% of its crude. Rising crude widens CAD, weakens rupee, raises input costs for many sectors. Watch Brent crude levels.",
+      date: new Date().toISOString().split("T")[0],
+      impact: "MEDIUM",
+      sentiment: "NEUTRAL",
+      isMajor: false,
     });
+
+    res.json({ symbol, majorEvents, microEvents });
   } catch (err: any) {
     req.log.error({ err }, "Events error");
     res.status(500).json({ error: "Failed to fetch events" });

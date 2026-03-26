@@ -70,6 +70,21 @@ export interface TechnicalIndicators {
   support2?: number | null;
 }
 
+export type SignalPointSignal =
+  (typeof SignalPointSignal)[keyof typeof SignalPointSignal];
+
+export const SignalPointSignal = {
+  BULLISH: "BULLISH",
+  BEARISH: "BEARISH",
+  NEUTRAL: "NEUTRAL",
+} as const;
+
+export interface SignalPoint {
+  label: string;
+  signal: SignalPointSignal;
+  detail: string;
+}
+
 export type AnalysisBiasDirection =
   (typeof AnalysisBiasDirection)[keyof typeof AnalysisBiasDirection];
 
@@ -93,6 +108,38 @@ export interface AnalysisBias {
   strength: AnalysisBiasStrength;
   summary: string;
   keyPoints: string[];
+  technicalSignals: SignalPoint[];
+  fundamentalSignals: SignalPoint[];
+}
+
+export type VolumeAnalysisTrend =
+  (typeof VolumeAnalysisTrend)[keyof typeof VolumeAnalysisTrend];
+
+export const VolumeAnalysisTrend = {
+  INCREASING: "INCREASING",
+  DECREASING: "DECREASING",
+  NEUTRAL: "NEUTRAL",
+} as const;
+
+export type VolumeAnalysisSignal =
+  (typeof VolumeAnalysisSignal)[keyof typeof VolumeAnalysisSignal];
+
+export const VolumeAnalysisSignal = {
+  BULLISH: "BULLISH",
+  BEARISH: "BEARISH",
+  NEUTRAL: "NEUTRAL",
+} as const;
+
+export interface VolumeAnalysis {
+  currentVolume: number;
+  avgVolume20d?: number | null;
+  volumeRatio?: number | null;
+  trend: VolumeAnalysisTrend;
+  signal: VolumeAnalysisSignal;
+  interpretation: string;
+  climaxVolume: boolean;
+  dryUpVolume: boolean;
+  recentVolumes: number[];
 }
 
 export interface StockAnalysis {
@@ -102,6 +149,7 @@ export interface StockAnalysis {
   shortTerm: AnalysisBias;
   longTerm: AnalysisBias;
   overallBias: AnalysisBias;
+  volumeAnalysis: VolumeAnalysis;
 }
 
 export interface StockFundamentals {

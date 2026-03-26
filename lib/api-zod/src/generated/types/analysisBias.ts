@@ -7,10 +7,13 @@
  */
 import type { AnalysisBiasDirection } from "./analysisBiasDirection";
 import type { AnalysisBiasStrength } from "./analysisBiasStrength";
+import type { SignalPoint } from "./signalPoint";
 
 export interface AnalysisBias {
   direction: AnalysisBiasDirection;
   strength: AnalysisBiasStrength;
   summary: string;
   keyPoints: string[];
+  technicalSignals: SignalPoint[];
+  fundamentalSignals: SignalPoint[];
 }

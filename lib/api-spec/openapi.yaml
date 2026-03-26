@@ -361,6 +361,21 @@ components:
           type: number
           nullable: true
 
+    SignalPoint:
+      type: object
+      properties:
+        label:
+          type: string
+        signal:
+          type: string
+          enum: [BULLISH, BEARISH, NEUTRAL]
+        detail:
+          type: string
+      required:
+        - label
+        - signal
+        - detail
+
     AnalysisBias:
       type: object
       properties:
@@ -376,11 +391,57 @@ components:
           type: array
           items:
             type: string
+        technicalSignals:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignalPoint"
+        fundamentalSignals:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignalPoint"
       required:
         - direction
         - strength
         - summary
         - keyPoints
+        - technicalSignals
+        - fundamentalSignals
+
+    VolumeAnalysis:
+      type: object
+      properties:
+        currentVolume:
+          type: number
+        avgVolume20d:
+          type: number
+          nullable: true
+        volumeRatio:
+          type: number
+          nullable: true
+        trend:
+          type: string
+          enum: [INCREASING, DECREASING, NEUTRAL]
+        signal:
+          type: string
+          enum: [BULLISH, BEARISH, NEUTRAL]
+        interpretation:
+          type: string
+        climaxVolume:
+          type: boolean
+        dryUpVolume:
+          type: boolean
+        recentVolumes:
+          type: array
+          items:
+            type: number
+      required:
+        - currentVolume
+        - trend
+        - signal
+        - interpretation
+        - climaxVolume
+        - dryUpVolume
+        - recentVolumes
 
     StockAnalysis:
       type: object
@@ -397,6 +458,8 @@ components:
           $ref: "#/components/schemas/AnalysisBias"
         overallBias:
           $ref: "#/components/schemas/AnalysisBias"
+        volumeAnalysis:
+          $ref: "#/components/schemas/VolumeAnalysis"
       required:
         - symbol
         - technicalIndicators
@@ -404,6 +467,7 @@ components:
         - shortTerm
         - longTerm
         - overallBias
+        - volumeAnalysis
 
     StockFundamentals:
       type: object
