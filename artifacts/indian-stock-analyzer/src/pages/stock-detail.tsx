@@ -11,7 +11,7 @@ import {
   GetStockChartInterval
 } from "@workspace/api-client-react";
 import { formatCurrency, formatLargeNumber, formatPercent, cn } from "@/lib/utils";
-import { ArrowDownRight, ArrowUpRight, Clock, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Clock, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, BarChart2, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
@@ -99,7 +99,7 @@ export default function StockDetail() {
         <Card className="border-border">
           <CardHeader className="p-4 border-b border-border/50 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <LineChart className="w-4 h-4 text-primary" />
+              <BarChart2 className="w-4 h-4 text-primary" />
               Price Action
             </CardTitle>
             <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
@@ -123,7 +123,7 @@ export default function StockDetail() {
             {chartLoading ? (
               <div className="w-full h-full flex items-center justify-center bg-card/50">
                 <div className="animate-pulse flex flex-col items-center gap-2">
-                  <LineChart className="w-8 h-8 text-muted-foreground opacity-50" />
+                  <BarChart2 className="w-8 h-8 text-muted-foreground opacity-50" />
                   <span className="text-xs text-muted-foreground">Loading chart data...</span>
                 </div>
               </div>
