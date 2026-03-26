@@ -100,25 +100,27 @@ export default function StockDetail() {
 
         {/* CHART */}
         <Card className="border-border overflow-hidden">
-          <CardHeader className="p-3 border-b border-border/50 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardHeader className="p-3 border-b border-border/50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 shrink-0">
               <BarChart2 className="w-4 h-4 text-primary" /> Candlestick Chart
             </CardTitle>
-            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-              {intervals.map((int) => (
-                <button
-                  key={int}
-                  onClick={() => setInterval(int)}
-                  className={cn(
-                    "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
-                    interval === int
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                  )}
-                >
-                  {int.toUpperCase()}
-                </button>
-              ))}
+            <div className="overflow-x-auto -mx-1 px-1 pb-0.5">
+              <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-max min-w-full sm:min-w-0">
+                {intervals.map((int) => (
+                  <button
+                    key={int}
+                    onClick={() => setInterval(int)}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-colors shrink-0",
+                      interval === int
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                    )}
+                  >
+                    {int.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0" style={{ height: 420 }}>
