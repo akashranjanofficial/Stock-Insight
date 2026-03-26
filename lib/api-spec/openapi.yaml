@@ -1,15 +1,16 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Indian Stock Analysis API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stocks
+    description: Stock data and analysis
 paths:
   /healthz:
     get:
@@ -24,6 +25,166 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /stocks/search:
+    get:
+      operationId: searchStocks
+      tags: [stocks]
+      summary: Search stocks by name or symbol
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockSearchResult"
+
+  /stocks/{symbol}/quote:
+    get:
+      operationId: getStockQuote
+      tags: [stocks]
+      summary: Get real-time stock quote
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: exchange
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [NSE, BSE]
+            default: NSE
+      responses:
+        "200":
+          description: Stock quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockQuote"
+
+  /stocks/{symbol}/chart:
+    get:
+      operationId: getStockChart
+      tags: [stocks]
+      summary: Get OHLCV chart data
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: interval
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ["5m", "15m", "30m", "1h", "4h", "1d", "1wk", "1mo"]
+        - name: exchange
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [NSE, BSE]
+            default: NSE
+      responses:
+        "200":
+          description: Chart candle data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Candle"
+
+  /stocks/{symbol}/analysis:
+    get:
+      operationId: getStockAnalysis
+      tags: [stocks]
+      summary: Get comprehensive stock analysis
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: exchange
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [NSE, BSE]
+            default: NSE
+      responses:
+        "200":
+          description: Full stock analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockAnalysis"
+
+  /stocks/{symbol}/fundamentals:
+    get:
+      operationId: getStockFundamentals
+      tags: [stocks]
+      summary: Get stock fundamental data
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: exchange
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [NSE, BSE]
+            default: NSE
+      responses:
+        "200":
+          description: Fundamental data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockFundamentals"
+
+  /stocks/{symbol}/events:
+    get:
+      operationId: getStockEvents
+      tags: [stocks]
+      summary: Get major and micro events affecting the stock
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: exchange
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [NSE, BSE]
+            default: NSE
+      responses:
+        "200":
+          description: Events data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockEvents"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +195,333 @@ components:
       required:
         - status
 
+    StockSearchResult:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        exchange:
+          type: string
+        sector:
+          type: string
+        marketCap:
+          type: number
+          nullable: true
+      required:
+        - symbol
+        - name
+        - exchange
+        - sector
+
+    StockQuote:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        exchange:
+          type: string
+        price:
+          type: number
+        change:
+          type: number
+        changePercent:
+          type: number
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        previousClose:
+          type: number
+        volume:
+          type: number
+        avgVolume:
+          type: number
+        marketCap:
+          type: number
+          nullable: true
+        week52High:
+          type: number
+        week52Low:
+          type: number
+        timestamp:
+          type: string
+      required:
+        - symbol
+        - name
+        - exchange
+        - price
+        - change
+        - changePercent
+        - open
+        - high
+        - low
+        - previousClose
+        - volume
+        - avgVolume
+        - week52High
+        - week52Low
+        - timestamp
+
+    Candle:
+      type: object
+      properties:
+        time:
+          type: number
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: number
+      required:
+        - time
+        - open
+        - high
+        - low
+        - close
+        - volume
+
+    TechnicalIndicators:
+      type: object
+      properties:
+        rsi:
+          type: number
+          nullable: true
+        macd:
+          type: number
+          nullable: true
+        macdSignal:
+          type: number
+          nullable: true
+        macdHistogram:
+          type: number
+          nullable: true
+        sma20:
+          type: number
+          nullable: true
+        sma50:
+          type: number
+          nullable: true
+        sma200:
+          type: number
+          nullable: true
+        ema9:
+          type: number
+          nullable: true
+        ema21:
+          type: number
+          nullable: true
+        bollingerUpper:
+          type: number
+          nullable: true
+        bollingerMiddle:
+          type: number
+          nullable: true
+        bollingerLower:
+          type: number
+          nullable: true
+        atr:
+          type: number
+          nullable: true
+        adx:
+          type: number
+          nullable: true
+        stochK:
+          type: number
+          nullable: true
+        stochD:
+          type: number
+          nullable: true
+        vwap:
+          type: number
+          nullable: true
+        pivotPoint:
+          type: number
+          nullable: true
+        resistance1:
+          type: number
+          nullable: true
+        resistance2:
+          type: number
+          nullable: true
+        support1:
+          type: number
+          nullable: true
+        support2:
+          type: number
+          nullable: true
+
+    AnalysisBias:
+      type: object
+      properties:
+        direction:
+          type: string
+          enum: [BULLISH, BEARISH, NEUTRAL]
+        strength:
+          type: string
+          enum: [STRONG, MODERATE, WEAK]
+        summary:
+          type: string
+        keyPoints:
+          type: array
+          items:
+            type: string
+      required:
+        - direction
+        - strength
+        - summary
+        - keyPoints
+
+    StockAnalysis:
+      type: object
+      properties:
+        symbol:
+          type: string
+        technicalIndicators:
+          $ref: "#/components/schemas/TechnicalIndicators"
+        intraday:
+          $ref: "#/components/schemas/AnalysisBias"
+        shortTerm:
+          $ref: "#/components/schemas/AnalysisBias"
+        longTerm:
+          $ref: "#/components/schemas/AnalysisBias"
+        overallBias:
+          $ref: "#/components/schemas/AnalysisBias"
+      required:
+        - symbol
+        - technicalIndicators
+        - intraday
+        - shortTerm
+        - longTerm
+        - overallBias
+
+    StockFundamentals:
+      type: object
+      properties:
+        symbol:
+          type: string
+        pe:
+          type: number
+          nullable: true
+        pb:
+          type: number
+          nullable: true
+        eps:
+          type: number
+          nullable: true
+        roe:
+          type: number
+          nullable: true
+        roce:
+          type: number
+          nullable: true
+        debtToEquity:
+          type: number
+          nullable: true
+        currentRatio:
+          type: number
+          nullable: true
+        revenueGrowthYoy:
+          type: number
+          nullable: true
+        profitGrowthYoy:
+          type: number
+          nullable: true
+        dividendYield:
+          type: number
+          nullable: true
+        bookValue:
+          type: number
+          nullable: true
+        faceValue:
+          type: number
+          nullable: true
+        promoterHolding:
+          type: number
+          nullable: true
+        fiisHolding:
+          type: number
+          nullable: true
+        diisHolding:
+          type: number
+          nullable: true
+        publicHolding:
+          type: number
+          nullable: true
+        sector:
+          type: string
+          nullable: true
+        industry:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        marketCap:
+          type: number
+          nullable: true
+        enterpriseValue:
+          type: number
+          nullable: true
+      required:
+        - symbol
+
+    StockEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [EARNINGS, DIVIDEND, CORPORATE_ACTION, MACRO, POLICY, SECTOR, OTHER]
+        title:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+        impact:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        sentiment:
+          type: string
+          enum: [POSITIVE, NEGATIVE, NEUTRAL]
+        isMajor:
+          type: boolean
+      required:
+        - id
+        - type
+        - title
+        - description
+        - date
+        - impact
+        - sentiment
+        - isMajor
+
+    StockEvents:
+      type: object
+      properties:
+        symbol:
+          type: string
+        majorEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockEvent"
+        microEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockEvent"
+      required:
+        - symbol
+        - majorEvents
+        - microEvents

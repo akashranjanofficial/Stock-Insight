@@ -16,12 +16,29 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Application: Indian Stock Analyzer (NiftyTerminal)
+
+A full-stack Indian stock analysis web app with:
+- Real-time NSE/BSE stock search and quotes (powered by yahoo-finance2)
+- Live OHLCV candlestick charts with 5m, 15m, 30m, 1h, 4h, 1d, 1wk, 1mo timeframes
+- Technical analysis: RSI, MACD, SMA20/50/200, EMA9/21, Bollinger Bands, ATR, ADX, Stochastic, VWAP, Pivot/S/R levels
+- Directional bias: Intraday, Short-term, Long-term with BULLISH/BEARISH/NEUTRAL + STRONG/MODERATE/WEAK strength
+- Fundamental analysis: P/E, P/B, EPS, ROE, ROCE, D/E, revenue/profit growth, dividends, shareholding
+- Events: earnings dates, dividends, analyst upgrades/downgrades, macro events (RBI, Budget, US Fed)
+- Auto-refresh every 30 seconds for live data without page reload
+- Dark professional terminal design (Bloomberg/TradingView aesthetic)
+
+Frontend: `artifacts/indian-stock-analyzer` (React + Vite)
+Backend routes: `artifacts/api-server/src/routes/stocks.ts`
+API spec: `lib/api-spec/openapi.yaml`
+
 ## Structure
 
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
+│   ├── api-server/         # Express API server
+│   └── indian-stock-analyzer/  # React + Vite frontend
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks

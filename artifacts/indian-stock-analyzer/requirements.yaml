@@ -1,0 +1,12 @@
+packages:
+  "recharts": "For rendering high-performance financial charts (candlesticks, volume)"
+  "framer-motion": "For smooth layout transitions and micro-interactions"
+  "date-fns": "For precise date formatting on charts and events"
+  "clsx": "For conditional class merging"
+  "tailwind-merge": "For merging tailwind classes safely"
+  "usehooks-ts": "For useDebounce hook to optimize search"
+
+notes:
+  - Application strictly uses a dark-mode professional terminal aesthetic
+  - Assuming Indian locale (en-IN) for number formatting
+  - Expects @workspace/api-client-react hooks to be available
