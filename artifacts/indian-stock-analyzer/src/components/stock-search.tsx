@@ -28,7 +28,7 @@ export function StockSearch({ className, size = "default" }: { className?: strin
   }, []);
 
   return (
-    <div ref={containerRef} className={cn("relative w-full max-w-2xl mx-auto z-50", className)}>
+    <div ref={containerRef} className={cn("relative w-full max-w-2xl mx-auto z-[9999]", className)}>
       <div className={cn(
         "relative flex items-center w-full rounded-xl border border-card-border bg-card/80 backdrop-blur-sm shadow-lg transition-all duration-200 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10",
         size === "large" ? "h-16 px-6" : "h-12 px-4"
@@ -55,7 +55,7 @@ export function StockSearch({ className, size = "default" }: { className?: strin
       </div>
 
       {isOpen && debouncedQuery[0].length > 1 && (
-        <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-card-border bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto animate-in fade-in slide-in-from-top-2">
+        <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-card-border bg-card shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto z-[9999] animate-in fade-in slide-in-from-top-2">
           {results && results.length > 0 ? (
             <div className="py-2">
               <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
