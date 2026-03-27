@@ -35,10 +35,18 @@ export default function StockDetail() {
   const { data: quote, isLoading: quoteLoading, refetch: refetchQuote, isFetching: isRefetching } = useGetStockQuote(symbol, { exchange }, {
     query: { refetchInterval: 30000 }
   });
-  const { data: chartData, isLoading: chartLoading } = useGetStockChart(symbol, { interval, exchange });
-  const { data: analysis, isLoading: analysisLoading } = useGetStockAnalysis(symbol, { exchange });
-  const { data: fundamentals, isLoading: fundamentalsLoading } = useGetStockFundamentals(symbol, { exchange });
-  const { data: events, isLoading: eventsLoading } = useGetStockEvents(symbol, { exchange });
+  const { data: chartData, isLoading: chartLoading } = useGetStockChart(symbol, { interval, exchange }, {
+    query: { refetchInterval: 60000 }
+  });
+  const { data: analysis, isLoading: analysisLoading } = useGetStockAnalysis(symbol, { exchange }, {
+    query: { refetchInterval: 120000 }
+  });
+  const { data: fundamentals, isLoading: fundamentalsLoading } = useGetStockFundamentals(symbol, { exchange }, {
+    query: { refetchInterval: 300000 }
+  });
+  const { data: events, isLoading: eventsLoading } = useGetStockEvents(symbol, { exchange }, {
+    query: { refetchInterval: 300000 }
+  });
 
   if (!symbol) return null;
 
