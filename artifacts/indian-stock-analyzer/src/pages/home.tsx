@@ -1,15 +1,17 @@
 import { Layout } from "@/components/layout";
 import { StockSearch } from "@/components/stock-search";
 import { motion } from "framer-motion";
-import { Activity, BarChart3, Globe, LineChart, Zap, TrendingUp, TrendingDown } from "lucide-react";
+import { Activity, BarChart3, Globe, Zap, TrendingUp, TrendingDown } from "lucide-react";
 import { useGetStockQuote } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 
 const INDICES = [
-  { symbol: "^NSEI",    name: "Nifty 50",   exchange: "NSE" },
-  { symbol: "^NSEBANK", name: "Bank Nifty",  exchange: "NSE" },
-  { symbol: "^BSESN",   name: "Sensex",      exchange: "BSE" },
+  { symbol: "^NSEI",      name: "Nifty 50"    },
+  { symbol: "^NSEBANK",   name: "Bank Nifty"  },
+  { symbol: "^BSESN",     name: "Sensex"      },
+  { symbol: "^CNXIT",     name: "Nifty IT"    },
+  { symbol: "^NSEMDCP50", name: "Nifty Midcap 50" },
 ];
 
 function IndexCard({ symbol, name }: { symbol: string; name: string }) {
@@ -25,35 +27,38 @@ function IndexCard({ symbol, name }: { symbol: string; name: string }) {
   return (
     <button
       onClick={() => setLocation(`/stock/${encodeURIComponent(symbol)}?exchange=INDEX`)}
+      style={{ minWidth: 160 }}
       className={cn(
-        "flex flex-col items-start p-4 rounded-2xl border bg-card/60 hover:bg-card transition-all duration-200 cursor-pointer text-left w-full",
+        "flex flex-col items-start p-3.5 rounded-2xl border bg-card/60 hover:bg-card transition-all duration-200 cursor-pointer text-left shrink-0",
         isUp === true  && "border-green-500/30 hover:border-green-500/50",
         isUp === false && "border-red-500/30 hover:border-red-500/50",
         isUp === null  && "border-border"
       )}
     >
-      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{name}</div>
+      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 whitespace-nowrap">
+        {name}
+      </div>
       {isLoading ? (
-        <div className="space-y-1 w-full">
-          <div className="h-6 w-28 bg-muted animate-pulse rounded" />
-          <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+        <div className="space-y-1.5 w-full">
+          <div className="h-5 w-24 bg-muted animate-pulse rounded" />
+          <div className="h-3.5 w-16 bg-muted animate-pulse rounded" />
         </div>
       ) : quote ? (
         <>
-          <div className="text-2xl font-bold font-mono tracking-tight">
+          <div className="text-lg font-bold font-mono tracking-tight whitespace-nowrap">
             {quote.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div className={cn(
-            "flex items-center gap-1 text-sm font-mono font-semibold mt-1",
+            "flex items-center gap-1 text-xs font-mono font-semibold mt-1 whitespace-nowrap",
             isUp ? "text-green-400" : "text-red-400"
           )}>
-            {isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-            {quote.change > 0 ? "+" : ""}{quote.change.toFixed(2)}{" "}
-            ({quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%)
+            {isUp ? <TrendingUp className="w-3 h-3 shrink-0" /> : <TrendingDown className="w-3 h-3 shrink-0" />}
+            <span>{quote.change > 0 ? "+" : ""}{quote.change.toFixed(2)}</span>
+            <span className="opacity-80">({quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%)</span>
           </div>
         </>
       ) : (
-        <div className="text-sm text-muted-foreground">Unavailable</div>
+        <div className="text-xs text-muted-foreground">Unavailable</div>
       )}
     </button>
   );
@@ -85,11 +90,15 @@ export default function Home() {
             Advanced technical indicators, fundamental deep-dives, and AI-driven bias analysis for Indian equities. Search any stock to begin.
           </p>
 
-          {/* Market Indices Strip */}
-          <div className="w-full grid grid-cols-3 gap-3 mb-10">
-            {INDICES.map((idx) => (
-              <IndexCard key={idx.symbol} symbol={idx.symbol} name={idx.name} />
-            ))}
+          {/* Scrollable Market Indices Strip */}
+          <div className="w-full mb-10 -mx-4 px-4">
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+              {INDICES.map((idx) => (
+                <div key={idx.symbol} className="snap-start">
+                  <IndexCard symbol={idx.symbol} name={idx.name} />
+                </div>
+              ))}
+            </div>
           </div>
 
           <StockSearch size="large" className="shadow-2xl shadow-primary/5" />
