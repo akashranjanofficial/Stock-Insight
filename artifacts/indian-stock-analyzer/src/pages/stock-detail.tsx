@@ -23,9 +23,11 @@ import { BarChart, Bar, ResponsiveContainer, Cell, Tooltip as RechartTooltip, YA
 
 export default function StockDetail() {
   const [, params] = useRoute("/stock/:symbol");
-  const symbol = params?.symbol?.toUpperCase() || "";
+  const symbol = decodeURIComponent(params?.symbol || "").toUpperCase();
   const searchParams = new URLSearchParams(window.location.search);
-  const exchange = (searchParams.get("exchange") || "NSE") as "NSE" | "BSE";
+  const exchangeParam = searchParams.get("exchange") || "NSE";
+  const isIndex = symbol.startsWith("^");
+  const exchange = (isIndex ? "NSE" : exchangeParam) as "NSE" | "BSE";
 
   const [interval, setInterval] = useState<GetStockChartInterval>("1d");
   const [activeTab, setActiveTab] = useState<"technical" | "fundamental" | "bias" | "events">("bias");
@@ -56,7 +58,7 @@ export default function StockDetail() {
           <div className="space-y-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-mono">{symbol}</h1>
-              <Badge variant="outline" className="font-mono text-xs">{exchange}</Badge>
+              <Badge variant="outline" className="font-mono text-xs">{isIndex ? "INDEX" : exchange}</Badge>
               {quote && (
                 <span className="text-sm text-muted-foreground truncate max-w-xs">{quote.name}</span>
               )}

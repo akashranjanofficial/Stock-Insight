@@ -6,7 +6,9 @@ const yahooFinance = new (YahooFinanceClass as any)();
 const router: IRouter = Router();
 
 function toNSESymbol(symbol: string, exchange: string = "NSE"): string {
-  const sym = symbol.toUpperCase().replace(/\.(NS|BO)$/, "");
+  const upper = symbol.toUpperCase();
+  if (upper.startsWith("^")) return upper;
+  const sym = upper.replace(/\.(NS|BO)$/, "");
   if (exchange === "BSE") return `${sym}.BO`;
   return `${sym}.NS`;
 }
@@ -388,15 +390,21 @@ router.get("/search", async (req, res) => {
     if (!q) { res.json([]); return; }
     const results = await yahooFinance.search(q, { newsCount: 0, quotesCount: 10 });
     const quotes = (results.quotes || [])
-      .filter((r: any) => r.quoteType === "EQUITY" && ((r.symbol || "").endsWith(".NS") || (r.symbol || "").endsWith(".BO")))
+      .filter((r: any) =>
+        (r.quoteType === "EQUITY" && ((r.symbol || "").endsWith(".NS") || (r.symbol || "").endsWith(".BO"))) ||
+        (r.quoteType === "INDEX" && (r.symbol || "").startsWith("^"))
+      )
       .slice(0, 8)
-      .map((r: any) => ({
-        symbol: formatSymbol(r.symbol),
-        name: r.longname || r.shortname || r.symbol,
-        exchange: (r.symbol || "").endsWith(".BO") ? "BSE" : "NSE",
-        sector: r.sector || "N/A",
-        marketCap: null,
-      }));
+      .map((r: any) => {
+        const isIndex = r.quoteType === "INDEX";
+        return {
+          symbol: isIndex ? r.symbol : formatSymbol(r.symbol),
+          name: r.longname || r.shortname || r.symbol,
+          exchange: isIndex ? "INDEX" : ((r.symbol || "").endsWith(".BO") ? "BSE" : "NSE"),
+          sector: isIndex ? "Index" : (r.sector || "N/A"),
+          marketCap: null,
+        };
+      });
     res.json(quotes);
   } catch (err: any) {
     req.log.error({ err }, "Search error");
