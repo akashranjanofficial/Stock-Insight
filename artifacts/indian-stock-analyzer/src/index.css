@@ -127,4 +127,12 @@
   .glass-panel {
     @apply bg-card/80 backdrop-blur-md border border-card-border shadow-lg shadow-black/20;
   }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
