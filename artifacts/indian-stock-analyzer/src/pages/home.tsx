@@ -7,10 +7,10 @@ import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 
 const INDICES = [
-  { symbol: "^NSEI",      name: "Nifty 50"    },
-  { symbol: "^NSEBANK",   name: "Bank Nifty"  },
-  { symbol: "^BSESN",     name: "Sensex"      },
-  { symbol: "^CNXIT",     name: "Nifty IT"    },
+  { symbol: "^NSEI", name: "Nifty 50" },
+  { symbol: "^NSEBANK", name: "Bank Nifty" },
+  { symbol: "^BSESN", name: "Sensex" },
+  { symbol: "^CNXIT", name: "Nifty IT" },
   { symbol: "^NSEMDCP50", name: "Nifty Midcap 50" },
 ];
 
@@ -19,7 +19,7 @@ function IndexCard({ symbol, name }: { symbol: string; name: string }) {
   const { data: quote, isLoading } = useGetStockQuote(
     symbol,
     { exchange: "NSE" },
-    { query: { refetchInterval: 30000 } }
+    { query: { refetchInterval: 30000 } as any }
   );
 
   const isUp = quote ? quote.changePercent >= 0 : null;
@@ -30,9 +30,9 @@ function IndexCard({ symbol, name }: { symbol: string; name: string }) {
       style={{ minWidth: 160 }}
       className={cn(
         "flex flex-col items-start p-3.5 rounded-2xl border bg-card/60 hover:bg-card transition-all duration-200 cursor-pointer text-left shrink-0",
-        isUp === true  && "border-green-500/30 hover:border-green-500/50",
+        isUp === true && "border-green-500/30 hover:border-green-500/50",
         isUp === false && "border-red-500/30 hover:border-red-500/50",
-        isUp === null  && "border-border"
+        isUp === null && "border-border"
       )}
     >
       <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 whitespace-nowrap">
@@ -82,7 +82,7 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 text-foreground">
-            Institutional Grade <br/>
+            Institutional Grade <br />
             <span className="text-gradient">Stock Intelligence</span>
           </h1>
 
@@ -105,10 +105,10 @@ export default function Home() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 w-full max-w-4xl">
             {[
-              { icon: Activity,  title: "Live Quotes",  desc: "Real-time market data" },
-              { icon: BarChart3, title: "Technicals",   desc: "15+ Indicators & VWAP" },
-              { icon: Globe,     title: "Fundamentals", desc: "Deep financial metrics" },
-              { icon: Zap,       title: "Events",       desc: "Earnings & Macro impacts" },
+              { icon: Activity, title: "Live Quotes", desc: "Real-time market data" },
+              { icon: BarChart3, title: "Technicals", desc: "15+ Indicators & VWAP" },
+              { icon: Globe, title: "Fundamentals", desc: "Deep financial metrics" },
+              { icon: Zap, title: "Events", desc: "Earnings & Macro impacts" },
             ].map((feature, i) => (
               <motion.div
                 key={i}

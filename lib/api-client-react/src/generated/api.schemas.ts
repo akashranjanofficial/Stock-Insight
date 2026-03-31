@@ -225,6 +225,66 @@ export interface StockEvents {
   microEvents: StockEvent[];
 }
 
+// ─── F&O Types ────────────────────────────────────────────────────────────────
+
+export interface OptionContract {
+  strike: number;
+  type: "CE" | "PE";
+  expiry: string;
+  ltp: number;
+  change: number;
+  changePercent: number;
+  oi: number;
+  oiChange: number;
+  volume: number;
+  iv: number;
+  bidPrice: number;
+  askPrice: number;
+  delta?: number;
+  gamma?: number;
+  theta?: number;
+  vega?: number;
+}
+
+export interface OptionChainResponse {
+  symbol: string;
+  spotPrice: number;
+  expiryDates: string[];
+  selectedExpiry: string;
+  strikes: number[];
+  calls: OptionContract[];
+  puts: OptionContract[];
+  timestamp: string;
+  dataSource: "nse" | "mock";
+}
+
+export interface FuturesContract {
+  symbol: string;
+  expiry: string;
+  ltp: number;
+  change: number;
+  changePercent: number;
+  oi: number;
+  oiChange: number;
+  volume: number;
+  lotSize: number;
+  basis: number;
+  prevClose: number;
+}
+
+export interface FuturesResponse {
+  symbol: string;
+  spotPrice: number;
+  contracts: FuturesContract[];
+  timestamp: string;
+  dataSource: "nse" | "mock";
+}
+
+export type GetStockOptionsParams = {
+  expiry?: string;
+  exchange?: string;
+};
+
 export type SearchStocksParams = {
   q: string;
 };
@@ -250,6 +310,8 @@ export type GetStockChartInterval =
   (typeof GetStockChartInterval)[keyof typeof GetStockChartInterval];
 
 export const GetStockChartInterval = {
+  "1m": "1m",
+  "2m": "2m",
   "5m": "5m",
   "15m": "15m",
   "30m": "30m",

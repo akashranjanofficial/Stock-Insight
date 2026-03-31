@@ -18,7 +18,7 @@ export function StockSearch({ className, size = "default" }: { className?: strin
 
   const { data: results, isLoading } = useSearchStocks(
     { q: debouncedQuery[0] },
-    { query: { enabled: debouncedQuery[0].length > 1 } }
+    { query: { enabled: debouncedQuery[0].length > 1 } as any }
   );
 
   // Recalculate dropdown position from the input box (viewport-relative for position:fixed)
@@ -93,8 +93,8 @@ export function StockSearch({ className, size = "default" }: { className?: strin
           {isLoading
             ? <Loader2 className="h-5 w-5 text-muted-foreground animate-spin ml-3 shrink-0" />
             : <kbd className="ml-3 hidden sm:inline-flex h-6 items-center gap-1 rounded border border-border bg-muted px-2 font-mono text-[10px] font-medium text-muted-foreground shrink-0">
-                <span className="text-xs">⌘</span>K
-              </kbd>
+              <span className="text-xs">⌘</span>K
+            </kbd>
           }
         </div>
       </div>

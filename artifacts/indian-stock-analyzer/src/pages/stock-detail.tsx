@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useRoute } from "wouter";
 import { Layout } from "@/components/layout";
 import { CandlestickChart } from "@/components/candlestick-chart";
+import { Watchlist } from "@/components/watchlist";
+import { OptionChain } from "@/components/option-chain";
 import {
   useGetStockQuote,
   useGetStockChart,
@@ -30,22 +32,22 @@ export default function StockDetail() {
   const exchange = (isIndex ? "NSE" : exchangeParam) as "NSE" | "BSE";
 
   const [interval, setInterval] = useState<GetStockChartInterval>("1d");
-  const [activeTab, setActiveTab] = useState<"technical" | "fundamental" | "bias" | "events">("bias");
+  const [activeTab, setActiveTab] = useState<"technical" | "fundamental" | "bias" | "events" | "watchlist" | "fno">("bias");
 
   const { data: quote, isLoading: quoteLoading, refetch: refetchQuote, isFetching: isRefetching } = useGetStockQuote(symbol, { exchange }, {
-    query: { refetchInterval: 30000 }
+    query: { refetchInterval: 30000 } as any
   });
-  const { data: chartData, isLoading: chartLoading } = useGetStockChart(symbol, { interval, exchange }, {
-    query: { refetchInterval: 60000 }
+  const { data: chartData, isLoading: chartLoading, isFetching: isChartFetching } = useGetStockChart(symbol, { interval, exchange }, {
+    query: { refetchInterval: 60000, placeholderData: (prev: any) => prev } as any
   });
   const { data: analysis, isLoading: analysisLoading } = useGetStockAnalysis(symbol, { exchange }, {
-    query: { refetchInterval: 120000 }
+    query: { refetchInterval: 120000 } as any
   });
   const { data: fundamentals, isLoading: fundamentalsLoading } = useGetStockFundamentals(symbol, { exchange }, {
-    query: { refetchInterval: 300000 }
+    query: { refetchInterval: 300000 } as any
   });
   const { data: events, isLoading: eventsLoading } = useGetStockEvents(symbol, { exchange }, {
-    query: { refetchInterval: 300000 }
+    query: { refetchInterval: 300000 } as any
   });
 
   if (!symbol) return null;
@@ -55,141 +57,124 @@ export default function StockDetail() {
   const colorClass = isUp ? "text-green-400" : "text-red-400";
   const bgClass = isUp ? "bg-green-500/10" : "bg-red-500/10";
 
-  const intervals: GetStockChartInterval[] = ["5m", "15m", "30m", "1h", "1d", "1wk", "1mo"];
+
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-5 space-y-5">
+      <div className="h-[calc(100vh-3.5rem)] w-full flex flex-col lg:flex-row overflow-hidden">
 
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-mono">{symbol}</h1>
-              <Badge variant="outline" className="font-mono text-xs">{isIndex ? "INDEX" : exchange}</Badge>
+        {/* LEFT COMPONENT - Chart & Header */}
+        <div className="flex-1 flex flex-col p-3 gap-2 overflow-hidden min-w-0">
+          {/* HEADER */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 shrink-0">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-mono">{symbol}</h1>
+                <Badge variant="outline" className="font-mono text-xs">{isIndex ? "INDEX" : exchange}</Badge>
+                {quote && (
+                  <span className="text-sm text-muted-foreground truncate max-w-xs">{quote.name}</span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-3">
+                {quoteLoading ? (
+                  <div className="h-10 w-36 bg-muted animate-pulse rounded" />
+                ) : quote ? (
+                  <>
+                    <span className="text-4xl font-mono font-bold tracking-tighter">
+                      {formatCurrency(quote.price)}
+                    </span>
+                    <div className={cn("flex items-center text-lg font-mono font-semibold px-2 py-0.5 rounded-md", colorClass, bgClass)}>
+                      <ColorIcon className="w-5 h-5 mr-1" />
+                      {quote.change > 0 ? "+" : ""}{quote.change.toFixed(2)} ({formatPercent(quote.changePercent)})
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
               {quote && (
-                <span className="text-sm text-muted-foreground truncate max-w-xs">{quote.name}</span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-3">
-              {quoteLoading ? (
-                <div className="h-10 w-36 bg-muted animate-pulse rounded" />
-              ) : quote ? (
-                <>
-                  <span className="text-4xl font-mono font-bold tracking-tighter">
-                    {formatCurrency(quote.price)}
+                <div className="hidden md:flex gap-2 text-sm font-mono text-muted-foreground">
+                  <span className="bg-card border border-border px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs">
+                    <Clock className="w-3 h-3" /> Vol: {formatLargeNumber(quote.volume)}
                   </span>
-                  <div className={cn("flex items-center text-lg font-mono font-semibold px-2 py-0.5 rounded-md", colorClass, bgClass)}>
-                    <ColorIcon className="w-5 h-5 mr-1" />
-                    {quote.change > 0 ? "+" : ""}{quote.change.toFixed(2)} ({formatPercent(quote.changePercent)})
-                  </div>
-                </>
-              ) : null}
+                  <span className="bg-card border border-border px-2.5 py-1 rounded-lg text-xs">H: {formatCurrency(quote.high)}</span>
+                  <span className="bg-card border border-border px-2.5 py-1 rounded-lg text-xs">L: {formatCurrency(quote.low)}</span>
+                </div>
+              )}
+              <button
+                onClick={() => refetchQuote()}
+                disabled={isRefetching}
+                className="p-1.5 rounded-lg bg-card border border-border hover:bg-accent transition-colors"
+              >
+                <RefreshCw className={cn("w-4 h-4", isRefetching && "animate-spin text-primary")} />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-sm font-mono text-muted-foreground flex-wrap">
-            {quote && (
-              <div className="flex gap-3">
-                <span className="bg-card border border-border px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" /> Vol: {formatLargeNumber(quote.volume)}
-                </span>
-                <span className="bg-card border border-border px-3 py-1.5 rounded-lg">H: {formatCurrency(quote.high)}</span>
-                <span className="bg-card border border-border px-3 py-1.5 rounded-lg">L: {formatCurrency(quote.low)}</span>
-              </div>
-            )}
-            <button
-              onClick={() => refetchQuote()}
-              disabled={isRefetching}
-              className="p-2 rounded-lg bg-card border border-border hover:bg-accent transition-colors"
-            >
-              <RefreshCw className={cn("w-4 h-4", isRefetching && "animate-spin text-primary")} />
-            </button>
-          </div>
-        </div>
-
-        {/* CHART */}
-        <Card className="border-border">
-          {/* Chart header — always two rows so timeframes get full width to scroll */}
-          <div className="p-3 border-b border-border/50 space-y-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-primary" /> Candlestick Chart
-            </CardTitle>
-            {/* Timeframe scroller — uses negative margin trick to bleed to card edges */}
-            <div className="overflow-x-auto scrollbar-none -mx-3 px-3">
-              <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-max">
-                {intervals.map((int) => (
-                  <button
-                    key={int}
-                    onClick={() => setInterval(int)}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0",
-                      interval === int
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                    )}
-                  >
-                    {int.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <CardContent className="p-0" style={{ height: 420 }}>
-            {chartLoading ? (
-              <div className="w-full h-full flex items-center justify-center bg-card/50">
+          {/* CHART — ALWAYS MOUNTED to preserve fullscreen + indicator state */}
+          <div className="flex-1 border border-border rounded-xl flex flex-col overflow-hidden min-h-0 relative">
+            <CandlestickChart data={chartData || []} symbol={symbol} interval={interval} onIntervalChange={(v) => setInterval(v as GetStockChartInterval)} />
+            {/* Loading overlay — shown during initial load or refetch */}
+            {(chartLoading && !chartData) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm z-10">
                 <div className="animate-pulse flex flex-col items-center gap-2">
                   <BarChart2 className="w-8 h-8 text-muted-foreground opacity-40" />
                   <span className="text-xs text-muted-foreground">Loading chart...</span>
                 </div>
               </div>
-            ) : chartData ? (
-              <CandlestickChart data={chartData} height={420} />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                Failed to load chart
-              </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* TABS */}
-        <div className="flex items-center gap-0 border-b border-border overflow-x-auto">
-          {[
-            { id: "bias",        label: "Directional Bias",    icon: Activity },
-            { id: "technical",   label: "Technical Analysis",  icon: BarChart2 },
-            { id: "fundamental", label: "Fundamentals",        icon: BookOpen },
-            { id: "events",      label: "Events & News",       icon: Zap },
-          ].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id as any)}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors",
-                activeTab === id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" /> {label}
-            </button>
-          ))}
+          </div>
         </div>
 
-        {/* TAB CONTENT */}
-        <div className="min-h-[400px]">
-          {activeTab === "bias" && (
-            <BiasTab analysis={analysis} isLoading={analysisLoading} />
-          )}
-          {activeTab === "technical" && (
-            <TechnicalTab analysis={analysis} isLoading={analysisLoading} />
-          )}
-          {activeTab === "fundamental" && (
-            <FundamentalTab fundamentals={fundamentals} isLoading={fundamentalsLoading} />
-          )}
-          {activeTab === "events" && (
-            <EventsTab events={events} isLoading={eventsLoading} />
-          )}
+        {/* RIGHT PANEL - Tabs */}
+        <div className={cn("w-full shrink-0 border-t lg:border-t-0 lg:border-l border-border bg-card/10 flex flex-col overflow-hidden", activeTab === 'fno' ? 'lg:w-[680px]' : 'lg:w-[380px]')}>
+          {/* TABS HEADER */}
+          <div className="flex items-center gap-0 border-b border-border overflow-x-auto shrink-0 px-2 pt-2">
+            {[
+              { id: "bias", label: "Bias", icon: Activity },
+              { id: "technical", label: "Technical", icon: BarChart2 },
+              { id: "fundamental", label: "Fundamental", icon: BookOpen },
+              { id: "events", label: "News", icon: Zap },
+              { id: "fno", label: "F&O", icon: BarChart2 },
+              { id: "watchlist", label: "Watchlist", icon: TrendingUp },
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id as any)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors",
+                  activeTab === id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                )}
+              >
+                <Icon className="w-3.5 h-3.5" /> {label}
+              </button>
+            ))}
+          </div>
+
+          {/* TAB CONTENT */}
+          <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-border">
+            {activeTab === "bias" && (
+              <BiasTab analysis={analysis} isLoading={analysisLoading} />
+            )}
+            {activeTab === "technical" && (
+              <TechnicalTab analysis={analysis} isLoading={analysisLoading} />
+            )}
+            {activeTab === "fundamental" && (
+              <FundamentalTab fundamentals={fundamentals} isLoading={fundamentalsLoading} />
+            )}
+            {activeTab === "events" && (
+              <EventsTab events={events} isLoading={eventsLoading} />
+            )}
+            {activeTab === "fno" && (
+              <OptionChain symbol={symbol} />
+            )}
+            {activeTab === "watchlist" && (
+              <Watchlist currentSymbol={symbol} />
+            )}
+          </div>
         </div>
 
       </div>
@@ -208,8 +193,8 @@ function SignalIcon({ signal }: { signal: string }) {
 function SignalBadge({ signal }: { signal: string }) {
   const cls =
     signal === "BULLISH" ? "bg-green-500/15 text-green-400 border-green-500/30" :
-    signal === "BEARISH" ? "bg-red-500/15 text-red-400 border-red-500/30" :
-    "bg-muted text-muted-foreground border-border";
+      signal === "BEARISH" ? "bg-red-500/15 text-red-400 border-red-500/30" :
+        "bg-muted text-muted-foreground border-border";
   return (
     <span className={cn("text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border uppercase tracking-wider", cls)}>
       {signal}
@@ -237,7 +222,7 @@ function BiasCard({ title, data, icon: Icon }: { title: string; data: any; icon:
   const isUp = data.direction === "BULLISH";
   const isDown = data.direction === "BEARISH";
   const dirColor = isUp ? "text-green-400" : isDown ? "text-red-400" : "text-muted-foreground";
-  const dirBg   = isUp ? "bg-green-500/10 border-green-500/30" : isDown ? "bg-red-500/10 border-red-500/30" : "bg-muted border-border";
+  const dirBg = isUp ? "bg-green-500/10 border-green-500/30" : isDown ? "bg-red-500/10 border-red-500/30" : "bg-muted border-border";
   const DirIcon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
 
   const techSignals: any[] = data.technicalSignals || [];
@@ -357,8 +342,8 @@ function VolumeAnalysisCard({ vol }: { vol: any }) {
 
         <div className={cn("p-3 rounded-xl border text-sm leading-relaxed",
           isUp ? "bg-green-500/5 border-green-500/20 text-green-300" :
-          isDown ? "bg-red-500/5 border-red-500/20 text-red-300" :
-          "bg-muted/30 border-border text-muted-foreground"
+            isDown ? "bg-red-500/5 border-red-500/20 text-red-300" :
+              "bg-muted/30 border-border text-muted-foreground"
         )}>
           {vol.interpretation}
         </div>
@@ -392,8 +377,8 @@ function BiasTab({ analysis, isLoading }: { analysis: any; isLoading: boolean })
       <div className={cn(
         "p-5 rounded-2xl border",
         isUp ? "bg-green-500/5 border-green-500/20" :
-        isDown ? "bg-red-500/5 border-red-500/20" :
-        "bg-muted border-border"
+          isDown ? "bg-red-500/5 border-red-500/20" :
+            "bg-muted border-border"
       )}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -418,7 +403,7 @@ function BiasTab({ analysis, isLoading }: { analysis: any; isLoading: boolean })
       <VolumeAnalysisCard vol={analysis.volumeAnalysis} />
 
       {/* 3 timeframe bias cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5">
         <BiasCard title="Intraday (Today)" data={analysis.intraday} icon={Activity} />
         <BiasCard title="Short Term (1-4W)" data={analysis.shortTerm} icon={TrendingUp} />
         <BiasCard title="Long Term (3-12M)" data={analysis.longTerm} icon={BarChart2} />
@@ -437,7 +422,7 @@ function TechnicalTab({ analysis, isLoading }: { analysis: any; isLoading: boole
 
   const MetricCard = ({ label, value, highlight }: { label: string; value: any; highlight?: "bull" | "bear" | null }) => {
     const cls = highlight === "bull" ? "border-green-500/30 bg-green-500/5 text-green-400" :
-                highlight === "bear" ? "border-red-500/30 bg-red-500/5 text-red-400" : "";
+      highlight === "bear" ? "border-red-500/30 bg-red-500/5 text-red-400" : "";
     return (
       <div className={cn("p-4 rounded-xl bg-card border border-card-border hover:border-primary/40 transition-colors", cls)}>
         <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">{label}</div>

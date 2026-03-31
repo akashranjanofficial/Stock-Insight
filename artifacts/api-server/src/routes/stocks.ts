@@ -212,8 +212,8 @@ function calcVolumeAnalysis(candles: { close: number; open: number; volume: numb
 // ─── Combined Bias Builder ────────────────────────────────────────────────────
 
 type Direction = "BULLISH" | "BEARISH" | "NEUTRAL";
-type Strength  = "STRONG" | "MODERATE" | "WEAK";
-type Signal    = "BULLISH" | "BEARISH" | "NEUTRAL";
+type Strength = "STRONG" | "MODERATE" | "WEAK";
+type Signal = "BULLISH" | "BEARISH" | "NEUTRAL";
 
 interface SignalPoint { label: string; signal: Signal; detail: string }
 
@@ -448,12 +448,14 @@ router.get("/:symbol/chart", async (req, res) => {
     const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
 
     const cfgMap: Record<string, { period1: string; interval: any }> = {
-      "5m":  { period1: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0], interval: "5m" },
+      "1m": { period1: new Date(Date.now() - 1 * 86400000).toISOString().split("T")[0], interval: "1m" },
+      "2m": { period1: new Date(Date.now() - 1 * 86400000).toISOString().split("T")[0], interval: "2m" },
+      "5m": { period1: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0], interval: "5m" },
       "15m": { period1: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0], interval: "15m" },
       "30m": { period1: new Date(Date.now() - 10 * 86400000).toISOString().split("T")[0], interval: "30m" },
-      "1h":  { period1: new Date(Date.now() - 20 * 86400000).toISOString().split("T")[0], interval: "1h" },
-      "4h":  { period1: new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0], interval: "60m" },
-      "1d":  { period1: new Date(Date.now() - 365 * 86400000).toISOString().split("T")[0], interval: "1d" },
+      "1h": { period1: new Date(Date.now() - 20 * 86400000).toISOString().split("T")[0], interval: "1h" },
+      "4h": { period1: new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0], interval: "60m" },
+      "1d": { period1: new Date(Date.now() - 365 * 86400000).toISOString().split("T")[0], interval: "1d" },
       "1wk": { period1: new Date(Date.now() - 3 * 365 * 86400000).toISOString().split("T")[0], interval: "1wk" },
       "1mo": { period1: new Date(Date.now() - 5 * 365 * 86400000).toISOString().split("T")[0], interval: "1mo" },
     };
@@ -495,39 +497,39 @@ router.get("/:symbol/analysis", async (req, res) => {
     ]);
 
     const candles = (dailyData.quotes || []).filter((c: any) => c.open != null && c.close != null);
-    const closes  = candles.map((c: any) => c.close as number);
-    const price   = quote.regularMarketPrice ?? (closes[closes.length - 1] ?? 0);
+    const closes = candles.map((c: any) => c.close as number);
+    const price = quote.regularMarketPrice ?? (closes[closes.length - 1] ?? 0);
     const currentVol = quote.regularMarketVolume ?? 0;
 
     // Build fundamentals snapshot for signal generation
-    const fd  = fundSummary?.financialData;
-    const ks  = fundSummary?.defaultKeyStatistics;
-    const sd  = fundSummary?.summaryDetail;
+    const fd = fundSummary?.financialData;
+    const ks = fundSummary?.defaultKeyStatistics;
+    const sd = fundSummary?.summaryDetail;
     const fundData = {
-      pe:                sd?.trailingPE ?? null,
-      pb:                ks?.priceToBook ?? null,
-      roe:               fd?.returnOnEquity ? fd.returnOnEquity * 100 : null,
-      debtToEquity:      fd?.debtToEquity ?? null,
-      currentRatio:      fd?.currentRatio ?? null,
-      revenueGrowthYoy:  fd?.revenueGrowth ? fd.revenueGrowth * 100 : null,
-      profitGrowthYoy:   fd?.earningsGrowth ? fd.earningsGrowth * 100 : null,
+      pe: sd?.trailingPE ?? null,
+      pb: ks?.priceToBook ?? null,
+      roe: fd?.returnOnEquity ? fd.returnOnEquity * 100 : null,
+      debtToEquity: fd?.debtToEquity ?? null,
+      currentRatio: fd?.currentRatio ?? null,
+      revenueGrowthYoy: fd?.revenueGrowth ? fd.revenueGrowth * 100 : null,
+      profitGrowthYoy: fd?.earningsGrowth ? fd.earningsGrowth * 100 : null,
     };
 
     // Technical indicators
-    const rsi           = calcRSI(closes);
-    const { macd, macdSignal, macdHistogram } = calcMACD(closes);
-    const sma20         = calcSMA(closes, 20);
-    const sma50         = calcSMA(closes, 50);
-    const sma200        = calcSMA(closes, 200);
-    const ema9          = calcEMA(closes, 9);
-    const ema21         = calcEMA(closes, 21);
-    const bb            = calcBollinger(closes);
-    const atr           = calcATR(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
-    const adx           = calcADX(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
-    const stoch         = calcStochastic(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
-    const vwap          = calcVWAP(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0 })));
-    const lastCandle    = candles[candles.length - 1];
-    const pivot         = lastCandle ? calcPivot(lastCandle.high, lastCandle.low, lastCandle.close) : { pivotPoint: null, resistance1: null, resistance2: null, support1: null, support2: null };
+    const rsi = calcRSI(closes);
+    const { macd, signal: macdSignal, histogram: macdHistogram } = calcMACD(closes);
+    const sma20 = calcSMA(closes, 20);
+    const sma50 = calcSMA(closes, 50);
+    const sma200 = calcSMA(closes, 200);
+    const ema9 = calcEMA(closes, 9);
+    const ema21 = calcEMA(closes, 21);
+    const bb = calcBollinger(closes);
+    const atr = calcATR(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
+    const adx = calcADX(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
+    const stoch = calcStochastic(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close })));
+    const vwap = calcVWAP(candles.map((c: any) => ({ high: c.high, low: c.low, close: c.close, volume: c.volume ?? 0 })));
+    const lastCandle = candles[candles.length - 1];
+    const pivot = lastCandle ? calcPivot(lastCandle.high, lastCandle.low, lastCandle.close) : { pivotPoint: null, resistance1: null, resistance2: null, support1: null, support2: null };
 
     // Volume analysis
     const volumeAnalysis = calcVolumeAnalysis(
@@ -536,20 +538,20 @@ router.get("/:symbol/analysis", async (req, res) => {
     );
 
     // Build signals per timeframe
-    const techIntraday   = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "intraday");
-    const techShortTerm  = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "shortTerm");
-    const techLongTerm   = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "longTerm");
-    const fundSignals    = getFundamentalSignals(fundData, volumeAnalysis);
+    const techIntraday = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "intraday");
+    const techShortTerm = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "shortTerm");
+    const techLongTerm = getTechnicalSignals(price, rsi, macd, macdHistogram, sma20, sma50, sma200, ema9, ema21, stoch.k, adx, bb, vwap, "longTerm");
+    const fundSignals = getFundamentalSignals(fundData, volumeAnalysis);
 
-    const intraday  = buildBias("Intraday",         techIntraday,  fundSignals);
-    const shortTerm = buildBias("Short-term",       techShortTerm, fundSignals);
-    const longTerm  = buildBias("Long-term",        techLongTerm,  fundSignals);
+    const intraday = buildBias("Intraday", techIntraday, fundSignals);
+    const shortTerm = buildBias("Short-term", techShortTerm, fundSignals);
+    const longTerm = buildBias("Long-term", techLongTerm, fundSignals);
 
     // Overall
     const allBull = [intraday, shortTerm, longTerm].filter((b) => b.direction === "BULLISH").length;
     const allBear = [intraday, shortTerm, longTerm].filter((b) => b.direction === "BEARISH").length;
     const overallDir: Direction = allBull > allBear ? "BULLISH" : allBear > allBull ? "BEARISH" : "NEUTRAL";
-    const overallStr: Strength  = Math.abs(allBull - allBear) >= 2 ? "STRONG" : Math.abs(allBull - allBear) === 1 ? "MODERATE" : "WEAK";
+    const overallStr: Strength = Math.abs(allBull - allBear) >= 2 ? "STRONG" : Math.abs(allBull - allBear) === 1 ? "MODERATE" : "WEAK";
     const overallBias = buildBias("Overall", techShortTerm, fundSignals);
     overallBias.direction = overallDir;
     overallBias.strength = overallStr;
@@ -634,7 +636,7 @@ router.get("/:symbol/events", async (req, res) => {
       calendarEvents = await yahooFinance.quoteSummary(yahooSymbol, {
         modules: ["calendarEvents", "upgradeDowngradeHistory"],
       });
-    } catch (_) {}
+    } catch (_) { }
 
     const majorEvents: any[] = [];
     const microEvents: any[] = [];
@@ -742,6 +744,47 @@ router.get("/:symbol/events", async (req, res) => {
   } catch (err: any) {
     req.log.error({ err }, "Events error");
     res.status(500).json({ error: "Failed to fetch events" });
+  }
+});
+
+// ─── Option Chain ─────────────────────────────────────────────────────────────
+
+import { fetchOptionChain, fetchFutures } from "./nse-proxy";
+
+router.get("/:symbol/options", async (req, res) => {
+  try {
+    const symbol = req.params.symbol;
+    const expiry = req.query.expiry as string | undefined;
+    const result = await fetchOptionChain(symbol, expiry);
+    res.json(result);
+  } catch (err: any) {
+    req.log.error({ err }, "Option chain error");
+    res.status(500).json({ error: "Failed to fetch option chain" });
+  }
+});
+
+router.get("/:symbol/options/:expiry", async (req, res) => {
+  try {
+    const symbol = req.params.symbol;
+    const expiry = req.params.expiry;
+    const result = await fetchOptionChain(symbol, expiry);
+    res.json(result);
+  } catch (err: any) {
+    req.log.error({ err }, "Option chain error");
+    res.status(500).json({ error: "Failed to fetch option chain" });
+  }
+});
+
+// ─── Futures ──────────────────────────────────────────────────────────────────
+
+router.get("/:symbol/futures", async (req, res) => {
+  try {
+    const symbol = req.params.symbol;
+    const result = await fetchFutures(symbol);
+    res.json(result);
+  } catch (err: any) {
+    req.log.error({ err }, "Futures error");
+    res.status(500).json({ error: "Failed to fetch futures data" });
   }
 });
 

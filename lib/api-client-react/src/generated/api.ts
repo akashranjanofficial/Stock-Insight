@@ -20,6 +20,7 @@ import type {
   GetStockEventsParams,
   GetStockFundamentalsParams,
   GetStockQuoteParams,
+  GetStockOptionsParams,
   HealthStatus,
   SearchStocksParams,
   StockAnalysis,
@@ -27,6 +28,8 @@ import type {
   StockFundamentals,
   StockQuote,
   StockSearchResult,
+  OptionChainResponse,
+  FuturesResponse,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -492,7 +495,7 @@ export const getGetStockAnalysisQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getStockAnalysis>>
   > = ({ signal }) =>
-    getStockAnalysis(symbol, params, { signal, ...requestOptions });
+      getStockAnalysis(symbol, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -608,7 +611,7 @@ export const getGetStockFundamentalsQueryOptions = <
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getStockFundamentals>>
   > = ({ signal }) =>
-    getStockFundamentals(symbol, params, { signal, ...requestOptions });
+      getStockFundamentals(symbol, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -765,5 +768,153 @@ export function useGetStockEvents<
     queryKey: QueryKey;
   };
 
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+// ─── Option Chain ─────────────────────────────────────────────────────────────
+
+export const getGetStockOptionsUrl = (
+  symbol: string,
+  params?: GetStockOptionsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) normalizedParams.append(key, String(value));
+  });
+  const queryStr = normalizedParams.toString();
+  return `/api/stocks/${symbol}/options${queryStr ? `?${queryStr}` : ""}`;
+};
+
+export const getStockOptions = async (
+  symbol: string,
+  params?: GetStockOptionsParams,
+  options?: RequestInit,
+): Promise<OptionChainResponse> => {
+  return customFetch<OptionChainResponse>(getGetStockOptionsUrl(symbol, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStockOptionsQueryKey = (
+  symbol: string,
+  params?: GetStockOptionsParams,
+) => {
+  return [`/api/stocks/${symbol}/options`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetStockOptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStockOptions>>,
+  TError = ErrorType<unknown>,
+>(
+  symbol: string,
+  params?: GetStockOptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStockOptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetStockOptionsQueryKey(symbol, params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getStockOptions>>> = ({
+    signal,
+  }) => getStockOptions(symbol, params, { signal, ...options?.request });
+  return { queryKey, queryFn, enabled: !!symbol, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStockOptions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export function useGetStockOptions<
+  TData = Awaited<ReturnType<typeof getStockOptions>>,
+  TError = ErrorType<unknown>,
+>(
+  symbol: string,
+  params?: GetStockOptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStockOptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStockOptionsQueryOptions(symbol, params, options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+// ─── Futures ──────────────────────────────────────────────────────────────────
+
+export const getGetStockFuturesUrl = (symbol: string) => {
+  return `/api/stocks/${symbol}/futures`;
+};
+
+export const getStockFutures = async (
+  symbol: string,
+  options?: RequestInit,
+): Promise<FuturesResponse> => {
+  return customFetch<FuturesResponse>(getGetStockFuturesUrl(symbol), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStockFuturesQueryKey = (symbol: string) => {
+  return [`/api/stocks/${symbol}/futures`] as const;
+};
+
+export const getGetStockFuturesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStockFutures>>,
+  TError = ErrorType<unknown>,
+>(
+  symbol: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStockFutures>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetStockFuturesQueryKey(symbol);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getStockFutures>>> = ({
+    signal,
+  }) => getStockFutures(symbol, { signal, ...options?.request });
+  return { queryKey, queryFn, enabled: !!symbol, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStockFutures>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export function useGetStockFutures<
+  TData = Awaited<ReturnType<typeof getStockFutures>>,
+  TError = ErrorType<unknown>,
+>(
+  symbol: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStockFutures>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStockFuturesQueryOptions(symbol, options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
   return { ...query, queryKey: queryOptions.queryKey };
 }
