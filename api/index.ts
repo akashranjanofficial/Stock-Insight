@@ -1,20 +1,17 @@
-// Vercel Serverless API Handler
-// Self-contained Express app for serverless deployment
-// This avoids importing the original app.ts which has TS module resolution issues on Vercel
+// @ts-nocheck
+// Vercel Serverless API - Self-contained Express app
+// Uses plain JS-compatible TS with @ts-nocheck to avoid compilation issues
 
 import express from "express";
 import cors from "cors";
-import YahooFinanceClass from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 
-const yahooFinance = new (YahooFinanceClass as any)();
+const yahooFinance = new YahooFinance();
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function toNSESymbol(symbol: string, exchange: string = "NSE"): string {
+function toNSESymbol(symbol, exchange = "NSE") {
     if (symbol.startsWith("^")) return symbol;
     if (exchange === "INDEX") return symbol;
     const suffix = exchange === "BSE" ? ".BO" : ".NS";
@@ -22,13 +19,11 @@ function toNSESymbol(symbol: string, exchange: string = "NSE"): string {
     return `${symbol}${suffix}`;
 }
 
-function formatSymbol(symbol: string): string {
+function formatSymbol(symbol) {
     return symbol.replace(/\.(NS|BO)$/, "");
 }
 
-// ─── Technical Calculators ────────────────────────────────────────────────────
-
-function calcRSI(closes: number[], period = 14): number | null {
+function calcRSI(closes, period = 14) {
     if (closes.length < period + 1) return null;
     let gains = 0, losses = 0;
     for (let i = 1; i <= period; i++) {
@@ -45,13 +40,13 @@ function calcRSI(closes: number[], period = 14): number | null {
     return 100 - 100 / (1 + avgGain / avgLoss);
 }
 
-function calcSMA(values: number[], period: number): number | null {
+function calcSMA(values, period) {
     if (values.length < period) return null;
     const slice = values.slice(-period);
     return slice.reduce((a, b) => a + b, 0) / period;
 }
 
-function calcEMA(values: number[], period: number): number | null {
+function calcEMA(values, period) {
     if (values.length < period) return null;
     const k = 2 / (period + 1);
     let ema = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
@@ -59,7 +54,7 @@ function calcEMA(values: number[], period: number): number | null {
     return ema;
 }
 
-function calcMACD(closes: number[]) {
+function calcMACD(closes) {
     const ema12 = calcEMA(closes, 12);
     const ema26 = calcEMA(closes, 26);
     if (ema12 == null || ema26 == null) return { macd: null, signal: null, histogram: null };
@@ -67,7 +62,7 @@ function calcMACD(closes: number[]) {
     return { macd, signal: null, histogram: null };
 }
 
-function calcBollinger(closes: number[], period = 20) {
+function calcBollinger(closes, period = 20) {
     const sma = calcSMA(closes, period);
     if (!sma || closes.length < period) return { upper: null, middle: null, lower: null };
     const slice = closes.slice(-period);
@@ -75,12 +70,8 @@ function calcBollinger(closes: number[], period = 20) {
     return { upper: sma + 2 * std, middle: sma, lower: sma - 2 * std };
 }
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
-
-// Health check
-app.get("/api/healthz", (_req, res) => {
-    res.json({ status: "ok" });
-});
+// Health
+app.get("/api/healthz", (_req, res) => { res.json({ status: "ok" }); });
 
 // Search
 app.get("/api/stocks/search", async (req, res) => {
@@ -89,23 +80,17 @@ app.get("/api/stocks/search", async (req, res) => {
         if (!q) return res.json([]);
         const results = await yahooFinance.search(q, { quotesCount: 10 });
         const quotes = (results.quotes || [])
-            .filter((r: any) => r.exchange === "NSI" || r.exchange === "NSE" || r.exchange === "BSE" || r.exchange === "BOM" || r.quoteType === "INDEX")
-            .map((r: any) => {
-                const isIndex = r.quoteType === "INDEX";
-                return {
-                    symbol: formatSymbol(r.symbol),
-                    name: r.shortname || r.longname || r.symbol,
-                    exchange: isIndex ? "INDEX" : (r.exchange === "BOM" || r.exchange === "BSE" ? "BSE" : "NSE"),
-                    type: isIndex ? "INDEX" : (r.quoteType || "EQUITY"),
-                    sector: isIndex ? "Index" : (r.sector || "N/A"),
-                    marketCap: null,
-                };
-            });
+            .filter((r) => r.exchange === "NSI" || r.exchange === "NSE" || r.exchange === "BSE" || r.exchange === "BOM" || r.quoteType === "INDEX")
+            .map((r) => ({
+                symbol: formatSymbol(r.symbol),
+                name: r.shortname || r.longname || r.symbol,
+                exchange: r.quoteType === "INDEX" ? "INDEX" : (r.exchange === "BOM" || r.exchange === "BSE" ? "BSE" : "NSE"),
+                type: r.quoteType === "INDEX" ? "INDEX" : (r.quoteType || "EQUITY"),
+                sector: r.quoteType === "INDEX" ? "Index" : (r.sector || "N/A"),
+                marketCap: null,
+            }));
         res.json(quotes);
-    } catch (err: any) {
-        console.error("Search error:", err.message);
-        res.json([]);
-    }
+    } catch (err) { console.error("Search error:", err.message); res.json([]); }
 });
 
 // Quote
@@ -115,28 +100,16 @@ app.get("/api/stocks/:symbol/quote", async (req, res) => {
         const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
         const quote = await yahooFinance.quote(yahooSymbol);
         res.json({
-            symbol: formatSymbol(req.params.symbol),
-            name: quote.shortName || quote.longName || req.params.symbol,
-            exchange,
-            price: quote.regularMarketPrice ?? 0,
-            change: quote.regularMarketChange ?? 0,
-            changePercent: quote.regularMarketChangePercent ?? 0,
-            open: quote.regularMarketOpen ?? 0,
-            high: quote.regularMarketDayHigh ?? 0,
-            low: quote.regularMarketDayLow ?? 0,
-            close: quote.regularMarketPreviousClose ?? 0,
-            volume: quote.regularMarketVolume ?? 0,
-            marketCap: quote.marketCap ?? 0,
-            pe: quote.trailingPE ?? 0,
-            eps: quote.epsTrailingTwelveMonths ?? 0,
-            week52High: quote.fiftyTwoWeekHigh ?? 0,
-            week52Low: quote.fiftyTwoWeekLow ?? 0,
+            symbol: formatSymbol(req.params.symbol), name: quote.shortName || quote.longName || req.params.symbol,
+            exchange, price: quote.regularMarketPrice ?? 0, change: quote.regularMarketChange ?? 0,
+            changePercent: quote.regularMarketChangePercent ?? 0, open: quote.regularMarketOpen ?? 0,
+            high: quote.regularMarketDayHigh ?? 0, low: quote.regularMarketDayLow ?? 0,
+            close: quote.regularMarketPreviousClose ?? 0, volume: quote.regularMarketVolume ?? 0,
+            marketCap: quote.marketCap ?? 0, pe: quote.trailingPE ?? 0, eps: quote.epsTrailingTwelveMonths ?? 0,
+            week52High: quote.fiftyTwoWeekHigh ?? 0, week52Low: quote.fiftyTwoWeekLow ?? 0,
             timestamp: new Date().toISOString(),
         });
-    } catch (err: any) {
-        console.error("Quote error:", err.message);
-        res.status(500).json({ error: "Failed to fetch quote" });
-    }
+    } catch (err) { console.error("Quote error:", err.message); res.status(500).json({ error: "Failed to fetch quote" }); }
 });
 
 // Chart
@@ -145,7 +118,7 @@ app.get("/api/stocks/:symbol/chart", async (req, res) => {
         const exchange = String(req.query.exchange || "NSE");
         const interval = String(req.query.interval || "1d");
         const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
-        const cfgMap: any = {
+        const cfgMap = {
             "1m": { period1: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0], interval: "1m" },
             "5m": { period1: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0], interval: "5m" },
             "15m": { period1: new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0], interval: "15m" },
@@ -155,25 +128,11 @@ app.get("/api/stocks/:symbol/chart", async (req, res) => {
         };
         const cfg = cfgMap[interval] || cfgMap["1d"];
         const result = await yahooFinance.chart(yahooSymbol, { period1: cfg.period1, interval: cfg.interval });
-        const quotes = result.quotes || [];
-        const candles = quotes.filter((q: any) => q.close != null).map((q: any) => ({
-            time: new Date(q.date).toISOString(),
-            open: q.open,
-            high: q.high,
-            low: q.low,
-            close: q.close,
-            volume: q.volume || 0,
+        const candles = (result.quotes || []).filter((q) => q.close != null).map((q) => ({
+            time: new Date(q.date).toISOString(), open: q.open, high: q.high, low: q.low, close: q.close, volume: q.volume || 0,
         }));
-        res.json({
-            symbol: formatSymbol(req.params.symbol),
-            interval,
-            candles,
-            timestamp: new Date().toISOString(),
-        });
-    } catch (err: any) {
-        console.error("Chart error:", err.message);
-        res.status(500).json({ error: "Failed to fetch chart data" });
-    }
+        res.json({ symbol: formatSymbol(req.params.symbol), interval, candles, timestamp: new Date().toISOString() });
+    } catch (err) { console.error("Chart error:", err.message); res.status(500).json({ error: "Failed to fetch chart data" }); }
 });
 
 // Analysis
@@ -185,32 +144,21 @@ app.get("/api/stocks/:symbol/analysis", async (req, res) => {
             yahooFinance.quote(yahooSymbol),
             yahooFinance.chart(yahooSymbol, { period1: new Date(Date.now() - 365 * 86400000).toISOString().split("T")[0], interval: "1d" }),
         ]);
-        const closes = (chartResult.quotes || []).filter((q: any) => q.close != null).map((q: any) => q.close);
+        const closes = (chartResult.quotes || []).filter((q) => q.close != null).map((q) => q.close);
         const price = quote.regularMarketPrice ?? 0;
-        const rsi = calcRSI(closes);
-        const { macd } = calcMACD(closes);
-        const sma20 = calcSMA(closes, 20);
-        const sma50 = calcSMA(closes, 50);
-        const sma200 = calcSMA(closes, 200);
-        const ema9 = calcEMA(closes, 9);
-        const bb = calcBollinger(closes);
-
+        const rsi = calcRSI(closes); const { macd } = calcMACD(closes);
+        const sma20 = calcSMA(closes, 20); const sma50 = calcSMA(closes, 50); const sma200 = calcSMA(closes, 200);
+        const ema9 = calcEMA(closes, 9); const bb = calcBollinger(closes);
         let direction = "Neutral";
         if (rsi && rsi > 60 && price > (sma50 ?? 0)) direction = "Bullish";
         else if (rsi && rsi < 40 && price < (sma50 ?? Infinity)) direction = "Bearish";
-
         res.json({
-            symbol: formatSymbol(req.params.symbol),
-            exchange,
-            price,
+            symbol: formatSymbol(req.params.symbol), exchange, price,
             technicals: { rsi, macd, sma20, sma50, sma200, ema9, bollingerBands: bb },
             bias: { direction, strength: "Moderate", summary: `${direction} bias based on technical indicators` },
             timestamp: new Date().toISOString(),
         });
-    } catch (err: any) {
-        console.error("Analysis error:", err.message);
-        res.status(500).json({ error: "Failed to fetch analysis" });
-    }
+    } catch (err) { console.error("Analysis error:", err.message); res.status(500).json({ error: "Failed to fetch analysis" }); }
 });
 
 // Fundamentals
@@ -220,37 +168,19 @@ app.get("/api/stocks/:symbol/fundamentals", async (req, res) => {
         const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
         const quote = await yahooFinance.quote(yahooSymbol);
         res.json({
-            symbol: formatSymbol(req.params.symbol),
-            name: quote.shortName || quote.longName || req.params.symbol,
-            marketCap: quote.marketCap ?? 0,
-            pe: quote.trailingPE ?? null,
-            forwardPe: quote.forwardPE ?? null,
-            eps: quote.epsTrailingTwelveMonths ?? null,
-            pb: quote.priceToBook ?? null,
-            dividendYield: quote.dividendYield ?? null,
-            week52High: quote.fiftyTwoWeekHigh ?? 0,
-            week52Low: quote.fiftyTwoWeekLow ?? 0,
-            avgVolume: quote.averageDailyVolume3Month ?? 0,
-            beta: quote.beta ?? null,
-            timestamp: new Date().toISOString(),
+            symbol: formatSymbol(req.params.symbol), name: quote.shortName || quote.longName || req.params.symbol,
+            marketCap: quote.marketCap ?? 0, pe: quote.trailingPE ?? null, forwardPe: quote.forwardPE ?? null,
+            eps: quote.epsTrailingTwelveMonths ?? null, pb: quote.priceToBook ?? null,
+            dividendYield: quote.dividendYield ?? null, week52High: quote.fiftyTwoWeekHigh ?? 0,
+            week52Low: quote.fiftyTwoWeekLow ?? 0, avgVolume: quote.averageDailyVolume3Month ?? 0,
+            beta: quote.beta ?? null, timestamp: new Date().toISOString(),
         });
-    } catch (err: any) {
-        console.error("Fundamentals error:", err.message);
-        res.status(500).json({ error: "Failed to fetch fundamentals" });
-    }
+    } catch (err) { console.error("Fundamentals error:", err.message); res.status(500).json({ error: "Failed to fetch fundamentals" }); }
 });
 
 // Events
-app.get("/api/stocks/:symbol/events", async (req, res) => {
-    try {
-        res.json({
-            symbol: formatSymbol(req.params.symbol),
-            events: [],
-            timestamp: new Date().toISOString(),
-        });
-    } catch (err: any) {
-        res.status(500).json({ error: "Failed to fetch events" });
-    }
+app.get("/api/stocks/:symbol/events", async (_req, res) => {
+    res.json({ symbol: formatSymbol(_req.params.symbol), events: [], timestamp: new Date().toISOString() });
 });
 
 // Options
@@ -260,40 +190,28 @@ app.get("/api/stocks/:symbol/options", async (req, res) => {
         const yahooSymbol = toNSESymbol(req.params.symbol, exchange);
         const result = await yahooFinance.options(yahooSymbol);
         res.json({
-            symbol: formatSymbol(req.params.symbol),
-            expirationDates: result.expirationDates || [],
-            calls: (result.options?.[0]?.calls || []).map((c: any) => ({
+            symbol: formatSymbol(req.params.symbol), expirationDates: result.expirationDates || [],
+            calls: (result.options?.[0]?.calls || []).map((c) => ({
                 strike: c.strike, ltp: c.lastPrice, change: c.change, volume: c.volume || 0,
                 oi: c.openInterest || 0, iv: c.impliedVolatility || 0, type: "CE", expiry: "",
                 changePercent: c.percentChange || 0, oiChange: 0, bidPrice: c.bid || 0, askPrice: c.ask || 0,
             })),
-            puts: (result.options?.[0]?.puts || []).map((p: any) => ({
+            puts: (result.options?.[0]?.puts || []).map((p) => ({
                 strike: p.strike, ltp: p.lastPrice, change: p.change, volume: p.volume || 0,
                 oi: p.openInterest || 0, iv: p.impliedVolatility || 0, type: "PE", expiry: "",
                 changePercent: p.percentChange || 0, oiChange: 0, bidPrice: p.bid || 0, askPrice: p.ask || 0,
             })),
             timestamp: new Date().toISOString(),
         });
-    } catch (err: any) {
-        console.error("Options error:", err.message);
-        res.status(500).json({ error: "Failed to fetch options" });
-    }
+    } catch (err) { console.error("Options error:", err.message); res.status(500).json({ error: "Failed to fetch options" }); }
 });
 
-// Futures (stub)
+// Futures
 app.get("/api/stocks/:symbol/futures", async (req, res) => {
-    res.json({
-        symbol: formatSymbol(req.params.symbol),
-        spotPrice: 0,
-        contracts: [],
-        timestamp: new Date().toISOString(),
-        dataSource: "mock",
-    });
+    res.json({ symbol: formatSymbol(req.params.symbol), spotPrice: 0, contracts: [], timestamp: new Date().toISOString(), dataSource: "mock" });
 });
 
-// Catch-all for unknown API routes
-app.all("/api/*", (_req, res) => {
-    res.status(404).json({ error: "Not found" });
-});
+// Catch-all
+app.all("/api/*", (_req, res) => { res.status(404).json({ error: "Not found" }); });
 
 export default app;
