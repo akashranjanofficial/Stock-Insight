@@ -50,3 +50,4 @@ Thumbs.db
 
 # Local SSL certificates
 .certs/
+.vercel
